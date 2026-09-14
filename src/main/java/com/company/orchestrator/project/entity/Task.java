@@ -1,7 +1,7 @@
 package com.company.orchestrator.project.entity;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 import com.baomidou.mybatisplus.annotation.FieldFill;
 import com.baomidou.mybatisplus.annotation.IdType;
@@ -28,27 +28,33 @@ public class Task {
 
     private Long projectId;
 
+    @TableField(updateStrategy = com.baomidou.mybatisplus.annotation.FieldStrategy.ALWAYS)
     private Long parentId;
 
+    @TableField(updateStrategy = com.baomidou.mybatisplus.annotation.FieldStrategy.ALWAYS)
     private Long milestoneId;
 
     private String name;
 
+    @TableField(updateStrategy = com.baomidou.mybatisplus.annotation.FieldStrategy.ALWAYS)
     private String description;
 
     private Integer priority;
 
+    @TableField(updateStrategy = com.baomidou.mybatisplus.annotation.FieldStrategy.ALWAYS)
     private Integer estimatedHours;
 
+    @TableField(updateStrategy = com.baomidou.mybatisplus.annotation.FieldStrategy.ALWAYS)
     private LocalDate startDate;
 
+    @TableField(updateStrategy = com.baomidou.mybatisplus.annotation.FieldStrategy.ALWAYS)
     private LocalDate endDate;
 
     private String status;
 
     @TableField(fill = FieldFill.INSERT)
-    private LocalDateTime createdAt;
+    private OffsetDateTime createdAt;
 
     @TableField(fill = FieldFill.INSERT_UPDATE)
-    private LocalDateTime updatedAt;
+    private OffsetDateTime updatedAt;
 }

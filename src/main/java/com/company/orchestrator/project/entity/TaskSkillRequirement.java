@@ -1,7 +1,7 @@
 package com.company.orchestrator.project.entity;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 import com.baomidou.mybatisplus.annotation.FieldFill;
 import com.baomidou.mybatisplus.annotation.IdType;
@@ -33,8 +33,8 @@ public class TaskSkillRequirement {
     private RequirementType requirementType;
 
     @TableField(fill = FieldFill.INSERT)
-    private LocalDateTime createdAt;
+    private OffsetDateTime createdAt;
 
     @TableField(fill = FieldFill.INSERT_UPDATE)
-    private LocalDateTime updatedAt;
+    private OffsetDateTime updatedAt;
 }

@@ -954,15 +954,15 @@ Maven 3.9+ (or just use the bundled Maven Wrapper)
 git clone https://github.com/hx346/ai-resource-orchestrator.git
 cd ai-resource-orchestrator
 
-# Configure your LLM (any OpenAI-compatible service)
-export AI_BASE_URL=https://api.example.com/v1
-export AI_API_KEY=xxxx
-export AI_MODEL=qwen
+# Set an administrator password before first startup (at least 12 characters)
+cp .env.example .env
+ADMIN_PASSWORD='change-this-to-a-long-secret'
+AI_MODE=demo
 
 docker compose up -d
 ```
 
-This starts `AI Resource Orchestrator + PostgreSQL`.
+Open `http://localhost:8080` and sign in as `admin`. The image builds and serves the Vue frontend as well as the API.
 
 ### Option 2: Local Development
 
@@ -1001,8 +1001,11 @@ Key configuration is injected via environment variables (template in [.env.examp
 | Variable | Description | Default |
 |---|---|---|
 | `AI_BASE_URL` | OpenAI-compatible endpoint | `https://api.openai.com` |
-| `AI_API_KEY` | LLM API key | empty (required) |
+| `AI_MODE` | `off` / `demo` / `live` | `off` |
+| `AI_CHAT_PROVIDER` | Spring AI provider, use `openai` in live mode | `none` |
+| `AI_API_KEY` | LLM API key, required in live mode | empty |
 | `AI_MODEL` | Model name | `gpt-4o-mini` |
+| `ADMIN_PASSWORD` | First-start admin password (at least 12 characters) | empty (required) |
 | `POSTGRES_HOST` / `POSTGRES_PORT` | Database host / port | `localhost` / `5432` |
 | `POSTGRES_DB` | Database name | `ai_resource_orchestrator` |
 | `POSTGRES_USER` / `POSTGRES_PASSWORD` | Database credentials | `postgres` / `postgres` |

@@ -29,13 +29,16 @@ public class ProjectService {
     private final ProjectMapper projectMapper;
     private final ProjectMilestoneMapper milestoneMapper;
     private final TaskMapper taskMapper;
+    private final org.springframework.jdbc.core.JdbcTemplate db;
+    public void lock(Long id) { db.queryForList("select id from project where id=? for update",id); requireExists(id); }
+
 
     public IPage<Project> page(long pageNum, long pageSize, String keyword, String status) {
         LambdaQueryWrapper<Project> wrapper = new LambdaQueryWrapper<Project>()
                 .like(StringUtils.hasText(keyword), Project::getName, keyword)
                 .eq(StringUtils.hasText(status), Project::getStatus, status)
                 .orderByDesc(Project::getId);
-        return projectMapper.selectPage(Page.of(pageNum, pageSize), wrapper);
+        return projectMapper.selectPage(Page.of(Math.max(1,pageNum), Math.max(1,Math.min(500,pageSize))), wrapper);
     }
 
     public Project requireExists(Long projectId) {
@@ -76,6 +79,8 @@ public class ProjectService {
     }
 
     private void apply(Project project, ProjectUpsertRequest request) {
+        if(request.startDate()!=null && request.endDate()!=null && request.endDate().isBefore(request.startDate())) throw new BusinessException(ErrorCode.BAD_REQUEST,"项目结束日期早于开始日期");
+        if(project.getId()!=null && db.queryForObject("select count(*) from task where project_id=? and ((?::date is not null and start_date < ?::date) or (?::date is not null and end_date > ?::date))",Long.class,project.getId(),request.startDate(),request.startDate(),request.endDate(),request.endDate())>0) throw new BusinessException(ErrorCode.BAD_REQUEST,"已有任务超出新的项目周期");
         project.setName(request.name());
         project.setDescription(request.description());
         project.setPriority(request.priority() == null ? Project.DEFAULT_PRIORITY : request.priority());

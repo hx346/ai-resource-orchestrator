@@ -8,6 +8,8 @@ import org.springframework.transaction.annotation.Transactional;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.company.orchestrator.skill.entity.SkillAlias;
 import com.company.orchestrator.skill.mapper.SkillAliasMapper;
+import com.company.orchestrator.common.exception.BusinessException;
+import com.company.orchestrator.common.exception.ErrorCode;
 
 import lombok.RequiredArgsConstructor;
 
@@ -36,7 +38,10 @@ public class SkillAliasService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public void delete(Long id) {
+    public void delete(Long skillId, Long id) {
+        SkillAlias alias = aliasMapper.selectById(id);
+        if (alias == null) throw new BusinessException(ErrorCode.BAD_REQUEST, "别名不存在");
+        if (!alias.getSkillId().equals(skillId)) throw new BusinessException(ErrorCode.BAD_REQUEST,"记录不属于指定资源");
         aliasMapper.deleteById(id);
     }
 }

@@ -30,10 +30,8 @@ public class TaskDependencyController {
 
     @Operation(summary = "查询任务前置依赖 / List predecessors of a task")
     @GetMapping
-    public Result<List<TaskDependencyRequest>> list(@PathVariable Long taskId) {
-        return Result.ok(dependencyService.listByTask(taskId).stream()
-                .map(TaskDependencyRequest::from)
-                .toList());
+    public Result<List<com.company.orchestrator.project.entity.TaskDependency>> list(@PathVariable Long taskId) {
+        return Result.ok(dependencyService.listByTask(taskId));
     }
 
     @Operation(summary = "新增任务依赖 / Add a predecessor dependency")
@@ -45,7 +43,7 @@ public class TaskDependencyController {
     @Operation(summary = "删除任务依赖 / Delete a dependency")
     @DeleteMapping("/{id}")
     public Result<Void> delete(@PathVariable Long taskId, @PathVariable Long id) {
-        dependencyService.delete(id);
+        dependencyService.delete(taskId, id);
         return Result.ok();
     }
 }

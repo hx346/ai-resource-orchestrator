@@ -29,6 +29,7 @@ public class TaskService {
     private final TaskDependencyMapper dependencyMapper;
     private final TaskSkillRequirementMapper requirementMapper;
     private final ProjectService projectService;
+    private final org.springframework.jdbc.core.JdbcTemplate db;
 
     public List<Task> listByProject(Long projectId) {
         projectService.requireExists(projectId);
@@ -37,6 +38,11 @@ public class TaskService {
                 .orderByAsc(Task::getId));
     }
 
+    public void requireEditable(Long taskId) { requireProjectEditable(requireExists(taskId).getProjectId()); }
+    private void requireProjectEditable(Long projectId) {
+        projectService.lock(projectId);
+        if(db.queryForObject("select count(*) from resource_allocation where project_id=? and status in ('CONFIRMED','PLANNED')",Long.class,projectId)>0) throw new BusinessException(ErrorCode.BAD_REQUEST,"请先撤销生效方案，再修改任务及需求");
+    }
     public Task requireExists(Long taskId) {
         Task task = taskMapper.selectById(taskId);
         if (task == null) {
@@ -66,6 +72,7 @@ public class TaskService {
     /** 删除任务（连同其依赖与技能需求）/ Delete task with dependencies and skill requirements. */
     @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
+        requireEditable(id);
         requireExists(id);
         dependencyMapper.delete(new LambdaQueryWrapper<TaskDependency>()
                 .eq(TaskDependency::getPredecessorTaskId, id)
@@ -78,6 +85,16 @@ public class TaskService {
     }
 
     private void apply(Task task, Long projectId, TaskUpsertRequest request) {
+        requireProjectEditable(projectId);
+        var project=projectService.requireExists(projectId);
+        if(request.startDate()!=null && request.endDate()!=null && request.endDate().isBefore(request.startDate())) throw new BusinessException(ErrorCode.BAD_REQUEST,"任务结束日期早于开始日期");
+        if(request.startDate()!=null && project.getStartDate()!=null && request.startDate().isBefore(project.getStartDate()) || request.endDate()!=null && project.getEndDate()!=null && request.endDate().isAfter(project.getEndDate())) throw new BusinessException(ErrorCode.BAD_REQUEST,"任务日期超出项目周期");
+        if(request.milestoneId()!=null && db.queryForObject("select count(*) from project_milestone where id=? and project_id=?",Long.class,request.milestoneId(),projectId)==0) throw new BusinessException(ErrorCode.BAD_REQUEST,"里程碑不属于该项目");
+        Long ancestor=request.parentId(); var seen=new java.util.HashSet<Long>();
+        while(ancestor!=null) {
+            if(ancestor.equals(task.getId()) || !seen.add(ancestor)) throw new BusinessException(ErrorCode.BAD_REQUEST,"任务层级存在循环");
+            ancestor=requireExists(ancestor).getParentId();
+        }
         if (request.parentId() != null) {
             Task parent = requireExists(request.parentId());
             if (!parent.getProjectId().equals(projectId)) {

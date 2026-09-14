@@ -1,7 +1,7 @@
 package com.company.orchestrator.project.entity;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 import com.baomidou.mybatisplus.annotation.FieldFill;
 import com.baomidou.mybatisplus.annotation.IdType;
@@ -29,6 +29,7 @@ public class Project {
 
     private String name;
 
+    @TableField(updateStrategy = com.baomidou.mybatisplus.annotation.FieldStrategy.ALWAYS)
     private String description;
 
     /** 优先级 1~5，1 最高 / Priority 1-5, 1 is highest. */
@@ -36,17 +37,21 @@ public class Project {
 
     private String status;
 
+    @TableField(updateStrategy = com.baomidou.mybatisplus.annotation.FieldStrategy.ALWAYS)
     private LocalDate startDate;
 
+    @TableField(updateStrategy = com.baomidou.mybatisplus.annotation.FieldStrategy.ALWAYS)
     private LocalDate endDate;
 
+    @TableField(updateStrategy = com.baomidou.mybatisplus.annotation.FieldStrategy.ALWAYS)
     private Long managerId;
 
+    @TableField(updateStrategy = com.baomidou.mybatisplus.annotation.FieldStrategy.ALWAYS)
     private String location;
 
     @TableField(fill = FieldFill.INSERT)
-    private LocalDateTime createdAt;
+    private OffsetDateTime createdAt;
 
     @TableField(fill = FieldFill.INSERT_UPDATE)
-    private LocalDateTime updatedAt;
+    private OffsetDateTime updatedAt;
 }

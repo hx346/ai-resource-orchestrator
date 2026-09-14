@@ -30,10 +30,8 @@ public class EmployeeAvailabilityController {
 
     @Operation(summary = "查询员工可用性 / List availability records of an employee")
     @GetMapping
-    public Result<List<AvailabilityUpsertRequest>> list(@PathVariable Long employeeId) {
-        return Result.ok(availabilityService.listByEmployee(employeeId).stream()
-                .map(AvailabilityUpsertRequest::from)
-                .toList());
+    public Result<List<com.company.orchestrator.employee.entity.EmployeeAvailability>> list(@PathVariable Long employeeId) {
+        return Result.ok(availabilityService.listByEmployee(employeeId));
     }
 
     @Operation(summary = "新增可用性记录 / Add an availability record")
@@ -46,7 +44,7 @@ public class EmployeeAvailabilityController {
     @Operation(summary = "删除可用性记录 / Delete an availability record")
     @DeleteMapping("/{id}")
     public Result<Void> delete(@PathVariable Long employeeId, @PathVariable Long id) {
-        availabilityService.delete(id);
+        availabilityService.delete(employeeId, id);
         return Result.ok();
     }
 }

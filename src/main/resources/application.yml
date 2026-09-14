@@ -2,9 +2,7 @@ spring:
   application:
     name: ai-resource-orchestrator
 
-  # Solver 域模型落地前排除 Timefold 自动装配，避免空求解配置导致启动失败；
-  # solver 模块开发时移除此排除。
-  # Exclude Timefold autoconfiguration until solver domain classes exist.
+  # SolverFactory is configured explicitly per request with a bounded solve duration.
   autoconfigure:
     exclude: ai.timefold.solver.spring.boot.autoconfigure.TimefoldSolverAutoConfiguration
 
@@ -27,6 +25,14 @@ spring:
     encoding: UTF-8
 
   ai:
+    model:
+      chat: ${AI_CHAT_PROVIDER:none}
+      embedding: none
+      image: none
+      moderation: none
+      audio:
+        speech: none
+        transcription: none
     openai:
       base-url: ${AI_BASE_URL:https://api.openai.com}
       api-key: ${AI_API_KEY:}
@@ -53,4 +59,8 @@ management:
 
 logging:
   level:
-    com.company.orchestrator: debug
+    com.company.orchestrator: info
+
+app:
+  admin-password: ${ADMIN_PASSWORD:}
+  ai-mode: ${AI_MODE:off}

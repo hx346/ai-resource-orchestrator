@@ -947,15 +947,15 @@ Maven 3.9+（或直接使用 Maven Wrapper）
 git clone https://github.com/hx346/ai-resource-orchestrator.git
 cd ai-resource-orchestrator
 
-# 配置 LLM（任意 OpenAI 兼容服务）
-export AI_BASE_URL=https://api.example.com/v1
-export AI_API_KEY=xxxx
-export AI_MODEL=qwen
+# 首次启动必须设置管理员密码（至少 12 个字符）
+cp .env.example .env
+ADMIN_PASSWORD='change-this-to-a-long-secret'
+AI_MODE=demo
 
 docker compose up -d
 ```
 
-即可启动 `AI Resource Orchestrator + PostgreSQL`。
+浏览器打开 `http://localhost:8080`，使用 `admin` 和 `ADMIN_PASSWORD` 登录。Docker 镜像会同时构建并托管 Vue 前端。
 
 ### 方式二：本地开发
 
@@ -994,8 +994,11 @@ ai-resource-orchestrator
 | 变量 | 说明 | 默认值 |
 |---|---|---|
 | `AI_BASE_URL` | OpenAI 兼容服务地址 | `https://api.openai.com` |
-| `AI_API_KEY` | LLM API Key | 空（必填） |
+| `AI_MODE` | `off` / `demo` / `live` | `off` |
+| `AI_CHAT_PROVIDER` | Spring AI 提供方，`live` 时使用 `openai` | `none` |
+| `AI_API_KEY` | LLM API Key，`live` 时必填 | 空 |
 | `AI_MODEL` | 模型名称 | `gpt-4o-mini` |
+| `ADMIN_PASSWORD` | 首次创建管理员的密码（至少 12 字符） | 空（必填） |
 | `POSTGRES_HOST` / `POSTGRES_PORT` | 数据库地址 | `localhost` / `5432` |
 | `POSTGRES_DB` | 数据库名 | `ai_resource_orchestrator` |
 | `POSTGRES_USER` / `POSTGRES_PASSWORD` | 数据库账号 | `postgres` / `postgres` |

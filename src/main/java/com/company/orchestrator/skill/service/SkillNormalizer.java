@@ -42,18 +42,18 @@ public class SkillNormalizer {
         String trimmed = rawName.trim();
 
         Skill exact = skillMapper.selectOne(new LambdaQueryWrapper<Skill>()
-                .eq(Skill::getName, trimmed)
+                .apply("lower(name) = lower({0})", trimmed).eq(Skill::getStatus,"ACTIVE")
                 .last("LIMIT 1"));
         if (exact != null) {
             return Optional.of(new NormalizedSkill(exact.getId(), exact.getName(), MATCHED_BY_EXACT));
         }
 
         SkillAlias alias = aliasMapper.selectOne(new LambdaQueryWrapper<SkillAlias>()
-                .eq(SkillAlias::getAlias, trimmed)
+                .apply("lower(alias) = lower({0})", trimmed)
                 .last("LIMIT 1"));
         if (alias != null) {
             Skill skill = skillMapper.selectById(alias.getSkillId());
-            if (skill != null) {
+            if (skill != null && !"INACTIVE".equals(skill.getStatus())) {
                 return Optional.of(new NormalizedSkill(skill.getId(), skill.getName(), MATCHED_BY_ALIAS));
             }
         }

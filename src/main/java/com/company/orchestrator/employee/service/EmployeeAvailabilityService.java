@@ -35,17 +35,19 @@ public class EmployeeAvailabilityService {
     @Transactional(rollbackFor = Exception.class)
     public Long create(Long employeeId, AvailabilityUpsertRequest request) {
         employeeService.requireExists(employeeId);
+        if(request.endDate().isBefore(request.startDate())) throw new BusinessException(ErrorCode.BAD_REQUEST,"结束日期早于开始日期");
         EmployeeAvailability availability = request.toEntity(employeeId);
         availabilityMapper.insert(availability);
         return availability.getId();
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public void delete(Long id) {
+    public void delete(Long employeeId, Long id) {
         EmployeeAvailability availability = availabilityMapper.selectById(id);
         if (availability == null) {
             throw new BusinessException(ErrorCode.AVAILABILITY_NOT_FOUND, id);
         }
+        if (!availability.getEmployeeId().equals(employeeId)) throw new BusinessException(ErrorCode.BAD_REQUEST,"记录不属于指定资源");
         availabilityMapper.deleteById(id);
     }
 }

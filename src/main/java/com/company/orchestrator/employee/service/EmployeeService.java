@@ -40,7 +40,7 @@ public class EmployeeService {
                         .like(Employee::getEmployeeNo, keyword))
                 .eq(departmentId != null, Employee::getDepartmentId, departmentId)
                 .orderByAsc(Employee::getId);
-        return employeeMapper.selectPage(Page.of(pageNum, pageSize), wrapper);
+        return employeeMapper.selectPage(Page.of(Math.max(1,pageNum), Math.max(1,Math.min(500,pageSize))), wrapper);
     }
 
     public List<Employee> listAll() {

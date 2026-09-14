@@ -30,10 +30,8 @@ public class TaskSkillRequirementController {
 
     @Operation(summary = "查询任务技能需求 / List skill requirements of a task")
     @GetMapping
-    public Result<List<TaskSkillRequirementRequest>> list(@PathVariable Long taskId) {
-        return Result.ok(requirementService.listByTask(taskId).stream()
-                .map(TaskSkillRequirementRequest::from)
-                .toList());
+    public Result<List<com.company.orchestrator.project.entity.TaskSkillRequirement>> list(@PathVariable Long taskId) {
+        return Result.ok(requirementService.listByTask(taskId));
     }
 
     @Operation(summary = "新增任务技能需求 / Add a skill requirement")
@@ -45,7 +43,7 @@ public class TaskSkillRequirementController {
     @Operation(summary = "删除任务技能需求 / Delete a skill requirement")
     @DeleteMapping("/{id}")
     public Result<Void> delete(@PathVariable Long taskId, @PathVariable Long id) {
-        requirementService.delete(id);
+        requirementService.delete(taskId, id);
         return Result.ok();
     }
 }

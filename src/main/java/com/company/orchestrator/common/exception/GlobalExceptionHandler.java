@@ -66,6 +66,19 @@ public class GlobalExceptionHandler {
                 .body(Result.fail(ErrorCode.INTERNAL_ERROR.code(), resolve(ErrorCode.INTERNAL_ERROR, null)));
     }
 
+    @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
+    public ResponseEntity<Result<Void>> handleIntegrity(org.springframework.dao.DataIntegrityViolationException e) {
+        log.warn("data integrity violation: {}", e.getMessage());
+        return ResponseEntity.status(409).body(Result.fail("CONFLICT",
+                messageSource.getMessage("error.data.conflict", null, "error.data.conflict",
+                        LocaleContextHolder.getLocale())));
+    }
+
+    @ExceptionHandler(org.springframework.web.server.ResponseStatusException.class)
+    public ResponseEntity<Result<Void>> handleStatus(org.springframework.web.server.ResponseStatusException e) {
+        return ResponseEntity.status(e.getStatusCode()).body(Result.fail("REQUEST_FAILED", e.getReason()));
+    }
+
     private ResponseEntity<Result<Void>> badRequest(String message) {
         return ResponseEntity.status(ErrorCode.BAD_REQUEST.httpStatus())
                 .body(Result.fail(ErrorCode.BAD_REQUEST.code(), message));

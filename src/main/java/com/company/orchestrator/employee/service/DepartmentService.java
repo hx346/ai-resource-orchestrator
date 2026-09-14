@@ -72,8 +72,10 @@ public class DepartmentService {
     }
 
     private void apply(Department department, DepartmentUpsertRequest request) {
-        if (request.parentId() != null && !request.parentId().equals(department.getId())) {
-            requireExists(request.parentId());
+        Long parent=request.parentId(); var seen=new java.util.HashSet<Long>();
+        while(parent!=null) {
+            if(parent.equals(department.getId()) || !seen.add(parent)) throw new BusinessException(ErrorCode.BAD_REQUEST,"部门层级存在循环");
+            parent=requireExists(parent).getParentId();
         }
         department.setParentId(request.parentId());
         department.setName(request.name());

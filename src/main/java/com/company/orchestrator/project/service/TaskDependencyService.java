@@ -24,6 +24,7 @@ public class TaskDependencyService {
 
     private final TaskDependencyMapper dependencyMapper;
     private final TaskService taskService;
+    private final org.springframework.jdbc.core.JdbcTemplate db;
 
     /** 查询任务的前置依赖 / List predecessors of a task. */
     public List<TaskDependency> listByTask(Long taskId) {
@@ -35,6 +36,12 @@ public class TaskDependencyService {
 
     @Transactional(rollbackFor = Exception.class)
     public Long create(Long successorTaskId, TaskDependencyRequest request) {
+        taskService.requireEditable(successorTaskId);
+        var successor=taskService.requireExists(successorTaskId);
+        var predecessor=taskService.requireExists(request.predecessorTaskId());
+        if(!successor.getProjectId().equals(predecessor.getProjectId())) throw new BusinessException(ErrorCode.INVALID_TASK_DEPENDENCY,"跨项目依赖");
+        db.queryForList("select id from project where id=? for update",successor.getProjectId());
+        if(Boolean.TRUE.equals(db.queryForObject("with recursive reachable(id) as (select successor_task_id from task_dependency where predecessor_task_id=? union select d.successor_task_id from task_dependency d join reachable r on d.predecessor_task_id=r.id) select exists(select 1 from reachable where id=?)",Boolean.class,successorTaskId,request.predecessorTaskId()))) throw new BusinessException(ErrorCode.INVALID_TASK_DEPENDENCY,"依赖形成循环");
         taskService.requireExists(successorTaskId);
         if (request.predecessorTaskId().equals(successorTaskId)) {
             throw new BusinessException(ErrorCode.INVALID_TASK_DEPENDENCY, "self dependency: " + successorTaskId);
@@ -53,11 +60,13 @@ public class TaskDependencyService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public void delete(Long id) {
+    public void delete(Long taskId, Long id) {
         TaskDependency dependency = dependencyMapper.selectById(id);
         if (dependency == null) {
             throw new BusinessException(ErrorCode.TASK_DEPENDENCY_NOT_FOUND, id);
         }
+        taskService.requireEditable(dependency.getSuccessorTaskId());
+        if (!dependency.getSuccessorTaskId().equals(taskId)) throw new BusinessException(ErrorCode.BAD_REQUEST,"记录不属于指定资源");
         dependencyMapper.deleteById(id);
     }
 }

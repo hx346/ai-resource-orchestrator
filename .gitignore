@@ -55,4 +55,7 @@ $RECYCLE.BIN/
 tmp/
 .temp/
 coverage/
+web/test-results/
+web/playwright-report/
+**/__pycache__/
 .flattened-pom.xml

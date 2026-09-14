@@ -1,6 +1,6 @@
 package com.company.orchestrator.common.config;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 import org.apache.ibatis.reflection.MetaObject;
 import org.springframework.stereotype.Component;
@@ -15,13 +15,13 @@ public class AuditFieldHandler implements MetaObjectHandler {
 
     @Override
     public void insertFill(MetaObject metaObject) {
-        LocalDateTime now = LocalDateTime.now();
-        strictInsertFill(metaObject, "createdAt", LocalDateTime.class, now);
-        strictInsertFill(metaObject, "updatedAt", LocalDateTime.class, now);
+        OffsetDateTime now = OffsetDateTime.now();
+        strictInsertFill(metaObject, "createdAt", OffsetDateTime.class, now);
+        strictInsertFill(metaObject, "updatedAt", OffsetDateTime.class, now);
     }
 
     @Override
     public void updateFill(MetaObject metaObject) {
-        strictUpdateFill(metaObject, "updatedAt", LocalDateTime.class, LocalDateTime.now());
+        setFieldValByName("updatedAt", OffsetDateTime.now(), metaObject);
     }
 }

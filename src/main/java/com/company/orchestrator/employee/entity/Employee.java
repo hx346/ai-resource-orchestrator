@@ -1,7 +1,7 @@
 package com.company.orchestrator.employee.entity;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 import com.baomidou.mybatisplus.annotation.FieldFill;
 import com.baomidou.mybatisplus.annotation.IdType;
@@ -43,8 +43,8 @@ public class Employee {
     private BigDecimal defaultCapacity;
 
     @TableField(fill = FieldFill.INSERT)
-    private LocalDateTime createdAt;
+    private OffsetDateTime createdAt;
 
     @TableField(fill = FieldFill.INSERT_UPDATE)
-    private LocalDateTime updatedAt;
+    private OffsetDateTime updatedAt;
 }

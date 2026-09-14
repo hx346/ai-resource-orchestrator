@@ -38,7 +38,7 @@ public class EmployeeSkillController {
     @Operation(summary = "全量替换员工技能 / Replace all skills of an employee")
     @PutMapping
     public Result<Void> replaceAll(@PathVariable Long employeeId,
-                                   @Valid @RequestBody List<EmployeeSkillUpsertRequest> requests) {
+                                   @Valid @RequestBody List<@Valid EmployeeSkillUpsertRequest> requests) {
         employeeSkillService.replaceAll(employeeId, requests);
         return Result.ok();
     }

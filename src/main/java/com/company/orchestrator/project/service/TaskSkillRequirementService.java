@@ -25,13 +25,12 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class TaskSkillRequirementService implements SkillUsagePort {
+public class TaskSkillRequirementService {
 
     private final TaskSkillRequirementMapper requirementMapper;
     private final TaskService taskService;
     private final SkillService skillService;
 
-    @Override
     public long countTaskRequirements(Long skillId) {
         return requirementMapper.selectCount(new LambdaQueryWrapper<TaskSkillRequirement>()
                 .eq(TaskSkillRequirement::getSkillId, skillId));
@@ -46,6 +45,7 @@ public class TaskSkillRequirementService implements SkillUsagePort {
 
     @Transactional(rollbackFor = Exception.class)
     public Long create(Long taskId, TaskSkillRequirementRequest request) {
+        taskService.requireEditable(taskId);
         taskService.requireExists(taskId);
         skillService.requireExists(request.skillId());
 
@@ -63,11 +63,13 @@ public class TaskSkillRequirementService implements SkillUsagePort {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public void delete(Long id) {
+    public void delete(Long taskId, Long id) {
         TaskSkillRequirement requirement = requirementMapper.selectById(id);
         if (requirement == null) {
             throw new BusinessException(ErrorCode.TASK_REQUIREMENT_NOT_FOUND, id);
         }
+        taskService.requireEditable(requirement.getTaskId());
+        if (!requirement.getTaskId().equals(taskId)) throw new BusinessException(ErrorCode.BAD_REQUEST,"记录不属于指定资源");
         requirementMapper.deleteById(id);
     }
 }

@@ -9,6 +9,14 @@ import org.springframework.http.HttpStatus;
 public enum ErrorCode {
 
     BAD_REQUEST("E40000", "error.bad.request", HttpStatus.BAD_REQUEST),
+    ROLE_INVALID("E40001", "auth.role.invalid", HttpStatus.BAD_REQUEST),
+
+    AI_NOT_ENABLED("E50301", "ai.not.enabled", HttpStatus.SERVICE_UNAVAILABLE),
+    AI_NO_PROVIDER("E50302", "ai.no.provider", HttpStatus.SERVICE_UNAVAILABLE),
+    AI_BUSY("E42901", "ai.busy", HttpStatus.TOO_MANY_REQUESTS),
+    AI_TIMEOUT("E50401", "ai.timeout", HttpStatus.GATEWAY_TIMEOUT),
+    AI_CANCELLED("E50303", "ai.cancelled", HttpStatus.SERVICE_UNAVAILABLE),
+    AI_UPSTREAM_FAILED("E50201", "ai.upstream.failed", HttpStatus.BAD_GATEWAY),
 
     EMPLOYEE_NOT_FOUND("E40401", "employee.not.found", HttpStatus.NOT_FOUND),
     DEPARTMENT_NOT_FOUND("E40402", "department.not.found", HttpStatus.NOT_FOUND),

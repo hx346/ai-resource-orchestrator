@@ -7,7 +7,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -28,11 +28,14 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-ai_resource_orchestrator}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      AI_BASE_URL: ${AI_BASE_URL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD (at least 12 characters) in .env}
+      AI_MODE: ${AI_MODE:-off}
+      AI_CHAT_PROVIDER: ${AI_CHAT_PROVIDER:-none}
+      AI_BASE_URL: ${AI_BASE_URL:-https://api.openai.com}
       AI_API_KEY: ${AI_API_KEY:-}
-      AI_MODEL: ${AI_MODEL:-}
+      AI_MODEL: ${AI_MODEL:-gpt-4o-mini}
     ports:
-      - "8080:8080"
+      - "127.0.0.1:${APP_PORT:-8080}:8080"
 
 volumes:
   postgres-data:

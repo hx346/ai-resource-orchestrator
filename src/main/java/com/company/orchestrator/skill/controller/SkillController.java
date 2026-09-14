@@ -91,7 +91,7 @@ public class SkillController {
     @Operation(summary = "删除技能别名 / Delete an alias")
     @DeleteMapping("/{id}/aliases/{aliasId}")
     public Result<Void> deleteAlias(@PathVariable Long id, @PathVariable Long aliasId) {
-        aliasService.delete(aliasId);
+        aliasService.delete(id, aliasId);
         return Result.ok();
     }
 

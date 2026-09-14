@@ -36,7 +36,7 @@ public class SkillService {
                 .like(StringUtils.hasText(keyword), Skill::getName, keyword)
                 .eq(categoryId != null, Skill::getCategoryId, categoryId)
                 .orderByAsc(Skill::getId);
-        return skillMapper.selectPage(Page.of(pageNum, pageSize), wrapper);
+        return skillMapper.selectPage(Page.of(Math.max(1,pageNum), Math.max(1,Math.min(500,pageSize))), wrapper);
     }
 
     public Skill requireExists(Long skillId) {
@@ -92,6 +92,11 @@ public class SkillService {
     }
 
     private void apply(Skill skill, SkillUpsertRequest request) {
+        Long parent=request.parentId(); var seen=new java.util.HashSet<Long>();
+        while(parent!=null) {
+            if(parent.equals(skill.getId()) || !seen.add(parent)) throw new BusinessException(ErrorCode.BAD_REQUEST,"技能层级存在循环");
+            parent=requireExists(parent).getParentId();
+        }
         skill.setCategoryId(request.categoryId());
         skill.setParentId(request.parentId());
         skill.setName(request.name());

@@ -30,10 +30,8 @@ public class ProjectMilestoneController {
 
     @Operation(summary = "查询项目里程碑 / List milestones of a project")
     @GetMapping("/api/v1/projects/{projectId}/milestones")
-    public Result<List<MilestoneUpsertRequest>> list(@PathVariable Long projectId) {
-        return Result.ok(milestoneService.listByProject(projectId).stream()
-                .map(MilestoneUpsertRequest::from)
-                .toList());
+    public Result<List<com.company.orchestrator.project.entity.ProjectMilestone>> list(@PathVariable Long projectId) {
+        return Result.ok(milestoneService.listByProject(projectId));
     }
 
     @Operation(summary = "创建里程碑 / Create milestone")

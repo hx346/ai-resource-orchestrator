@@ -58,7 +58,7 @@ public class EmployeeSkillService {
     @Transactional(rollbackFor = Exception.class)
     public void replaceAll(Long employeeId, List<EmployeeSkillUpsertRequest> requests) {
         employeeService.requireExists(employeeId);
-        requests.forEach(request -> skillMapper.selectById(request.skillId()));
+        requests.forEach(request -> { if(skillMapper.selectById(request.skillId())==null) throw new com.company.orchestrator.common.exception.BusinessException(com.company.orchestrator.common.exception.ErrorCode.SKILL_NOT_FOUND,request.skillId()); });
 
         employeeSkillMapper.delete(new LambdaQueryWrapper<EmployeeSkill>()
                 .eq(EmployeeSkill::getEmployeeId, employeeId));
@@ -69,7 +69,7 @@ public class EmployeeSkillService {
             employeeSkill.setLevel(request.level());
             employeeSkill.setExperienceMonths(request.experienceMonths() == null ? 0 : request.experienceMonths());
             employeeSkill.setSource(request.source() == null ? SkillSource.SELF : request.source());
-            employeeSkill.setConfidence(request.confidence());
+            employeeSkill.setConfidence(request.confidence()==null?java.math.BigDecimal.ONE:request.confidence());
             employeeSkill.setVerified(Boolean.FALSE);
             employeeSkill.setLastUsedAt(request.lastUsedAt());
             employeeSkillMapper.insert(employeeSkill);
