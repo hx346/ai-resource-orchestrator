@@ -48,6 +48,7 @@ Backend: Java 25, Spring Boot 3.5, MyBatis-Plus + JdbcTemplate, Flyway (PostgreS
 
 `auth`, `employee`, `skill`, `project`, `allocation`, `solver`, `ai`, `system`, `common`. CRUD modules follow `controller/dto/entity/mapper/service`; `solver`/`allocation`/`system` are flatter and use raw `JdbcTemplate`.
 
+- `skill` also hosts `AiSkillProfileService`: AI skill-profile drafts from experience text (`demo` = deterministic `DemoSkillExtractor`, `live` = LLM + `SkillNormalizer`), human-confirmed merges into `employee_skill` (`ai-accept`), and skill evidence aggregated from active allocations (`skills/evidence`). AI extracts; only humans confirm writes.
 - Cross-module dependency inversion: `skill/api/SkillUsagePort` is implemented by project's `TaskSkillUsageAdapter` to avoid skill ↔ project cycles. Follow this port pattern for new cross-module queries.
 - `common`: `Result<T>` envelope (`Result.ok(...)` from every controller), `ErrorCode` + `BusinessException` + `GlobalExceptionHandler`, shared enums (AvailabilityType, DependencyType, RequirementType, SkillSource).
 
@@ -73,7 +74,7 @@ Same-origin form-login sessions; every non-GET API call needs the CSRF token fro
 
 ### Frontend
 
-Deliberately minimal: `App.vue` is the whole app (tab views: projects/employees/skills/timeline/settings; project detail drives the workflow — task list plus a day-granularity CSS Gantt, the timeline tab renders `GET /api/v1/allocations/timeline` as a weekly capacity heatmap), `components/EditDialog.vue` for all forms, `api.ts` for CSRF + fetch + SSE parsing (`streamPlan` handles `progress`/`result`/`error` events). Sends `Accept-Language: zh-CN`.
+Deliberately minimal: `App.vue` is the whole app (tab views: projects/employees/skills/timeline/settings; project detail drives the workflow — task list plus a day-granularity CSS Gantt, the timeline tab renders `GET /api/v1/allocations/timeline` as a weekly capacity heatmap; employee detail includes an AI skill-recognition panel — experience text → draft → human-confirmed profile write), `components/EditDialog.vue` for all forms, `api.ts` for CSRF + fetch + SSE parsing (`streamPlan` handles `progress`/`result`/`error` events). Sends `Accept-Language: zh-CN`.
 
 ## Conventions
 

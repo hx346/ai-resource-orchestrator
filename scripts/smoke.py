@@ -118,6 +118,21 @@ def main():
     for c in peers:c.login('admin',os.environ['ARO_ADMIN_PASSWORD'])
     with ThreadPoolExecutor(max_workers=2) as pool:
         list(pool.map(lambda c:c.call(f'/resource-plans/{fresh}/confirm','POST'),peers))
+    # Phase 3: AI skill draft, human-confirmed merge, history evidence / 自动能力画像。
+    fresh_plan=a.call(f'/resource-plans/{fresh}')
+    emp=fresh_plan['items'][0]['employee_id']
+    evidence=a.call(f'/employees/{emp}/skills/evidence')
+    assert evidence and evidence[0]['skill_name']=='Java' and evidence[0]['project_count']>=1,evidence
+    extracted=a.call(f'/employees/{emp}/skills/ai-extract','POST',{'text':'精通 Java，负责 Vue 组件开发','source':'RESUME'})
+    assert extracted['mode']=='demo',extracted
+    matched=[i for i in extracted['skills'] if i['skillId']]
+    assert matched and matched[0]['level']==5 and matched[0]['confidence']==0.9,extracted
+    written=a.call(f'/employees/{emp}/skills/ai-accept','POST',[{'skillId':matched[0]['skillId'],'level':matched[0]['level'],'source':'RESUME','confidence':matched[0]['confidence']}])
+    assert written==1
+    profile={row['skillId']:row['level'] for row in a.call(f'/employees/{emp}/skills')}
+    assert profile.get(matched[0]['skillId'])==5,profile
+    a.call(f'/employees/{emp}/skills/ai-extract','POST',{'text':'普通文本','source':'MANAGER'},status=400)
+    print('PASS: AI skill draft extraction, human-confirmed merge and history evidence')
     a.call(f'/resource-plans/{fresh}/cancel','POST')
     print('PASS: concurrent duplicate confirmation is safe')
     print('ALL API SMOKE CHECKS PASSED; record suffix:',suffix)

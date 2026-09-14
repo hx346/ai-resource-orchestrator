@@ -23,3 +23,12 @@
 /* ---------- Phase 2: cross-project load warnings / 跨项目负载预警 ---------- */
 .load-warn{background:#f8e3da;color:#a45a45}
 .load-warn small{color:#b07560}
+
+/* ---------- Phase 3: AI skill recognition / AI 能力识别 ---------- */
+.profile-text{width:100%;min-height:88px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;font:inherit;font-size:12px;line-height:1.6;resize:vertical;background:#fff;color:inherit;margin:8px 0}
+.actions.pad-top{padding-top:4px}
+.draft-skills{margin-top:14px;border:1px dashed var(--line);border-radius:8px;padding:14px;background:#fbfcf8}
+.draft-skills table{width:100%}
+.draft-skills th,.draft-skills td{padding:6px 8px;text-align:left;vertical-align:top;font-size:11px}
+.draft-skills tr.off td{color:var(--muted)}
+.tags.evidence{margin:6px 0 0}

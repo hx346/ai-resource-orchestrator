@@ -210,7 +210,7 @@ Verified: true
 
 ## AI Skill Recognition
 
-Later phases will support generating an employee's initial skill profile via AI.
+AI generates a skill-profile **draft** from experience text; the employee or their manager always confirms it (the Phase 3 core loop is shipped).
 
 Input:
 
@@ -236,6 +236,12 @@ AI output:
 ```
 
 The final profile is always confirmed by the employee or their manager.
+
+**Current implementation (v0.3 dev)**:
+
+- `POST /api/v1/employees/{id}/skills/ai-extract`: submit resume / project-experience text; AI extracts a skill draft (name, L1-L5 level, confidence, rationale) normalized against the skill library by name/alias. `demo` mode uses deterministic keyword rules (nearest tier word, ASCII word boundaries) with no model calls.
+- `GET /api/v1/employees/{id}/skills/evidence`: historical task analysis — skill requirements aggregated from the employee's active allocations (project count, total hours, last used), shown as profile evidence.
+- `POST /api/v1/employees/{id}/skills/ai-accept`: writes human-checked items into the profile (`source=RESUME/PROJECT/AI`, `verified=false`); existing skills are updated, new ones inserted. AI never persists directly.
 
 ---
 
@@ -912,6 +918,14 @@ Response:
 }
 ```
 
+### Skill Recognition API
+
+```text
+POST /api/v1/employees/{id}/skills/ai-extract   # experience text -> skill draft (nothing persisted)
+POST /api/v1/employees/{id}/skills/ai-accept    # human-confirmed write into the profile
+GET  /api/v1/employees/{id}/skills/evidence     # skill evidence from historical allocations
+```
+
 ### Solver API
 
 ```text
@@ -1107,7 +1121,7 @@ Once this loop runs end to end, the MVP is a success.
 
 - **Phase 1 — Foundation MVP**: Employee, Skill, Project, AI Planner, Skill Matching, Timefold Solver, Resource Plan
 - **Phase 2 — Richer resource management**: multi-project orchestration, resource timeline, capacity heatmap, cross-project conflicts, plan comparison, capability gap analysis (in progress: skill-level gap analysis and the weekly capacity timeline are shipped)
-- **Phase 3 — Automated skill profiles**: resume parsing, project history parsing, historical task analysis, AI skill profile, automatic skill updates
+- **Phase 3 — Automated skill profiles**: resume parsing, project history parsing, historical task analysis, AI skill profile, automatic skill updates (in progress: experience-text skill drafts, historical task analysis, and human-confirmed profile writes are shipped; semantic-similarity normalization and automatic skill updates come later)
 - **Phase 4 — Dynamic replanning**: automatically re-solve on delays / leave / requirement changes / priority changes / new hires (Event → Impact Analysis → Solver → New Plan → AI explanation → Human confirmation)
 - **Phase 5 — Enterprise integrations**: Jira, ZenTao, GitLab, GitHub, Feishu, DingTalk, WeCom, HR systems, ERP, MES
 - **Phase 6 — Organizational capability decisions**: skill supply/demand gap forecasting based on the future project pipeline, with hiring / training / outsourcing / transfer suggestions — evolving into an enterprise resource intelligence platform

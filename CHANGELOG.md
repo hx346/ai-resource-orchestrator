@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- Phase 3 core: AI skill-profile drafts from experience text (`POST /employees/{id}/skills/ai-extract`) with name/alias normalization, a deterministic demo extractor (nearest tier keyword, ASCII word boundaries), human-confirmed merges into `employee_skill` (`POST .../ai-accept`, `source=RESUME/PROJECT/AI`, `verified=false`), and historical task skill evidence (`GET .../skills/evidence`). Frontend employee profile gains an AI recognition panel with evidence chips and a confirmable draft table.
 
 ## [0.1.0] - 2026-09-14
 

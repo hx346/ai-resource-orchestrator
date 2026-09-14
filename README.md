@@ -210,7 +210,7 @@ Verified: true
 
 ## AI 技能识别
 
-后续支持通过 AI 自动生成员工初始能力画像。
+支持通过 AI 从经历文本生成员工技能画像**草稿**，最终由员工或负责人确认（Phase 3 核心链路已落地）。
 
 输入：
 
@@ -236,6 +236,12 @@ AI 输出：
 ```
 
 最终由员工或负责人确认。
+
+**当前实现（v0.3 dev）**：
+
+- `POST /api/v1/employees/{id}/skills/ai-extract`：提交简历 / 项目经历文本，AI 提取技能草稿（名称、等级 L1–L5、置信度、依据），并经技能名 / 别名归一化匹配技能库；`demo` 模式使用确定性关键词规则（最近等级词推断、ASCII 词边界），不调用模型。
+- `GET /api/v1/employees/{id}/skills/evidence`：历史任务分析——聚合员工已生效分配所涉任务的技能需求（项目数、总工时、最近使用），作为画像证据展示。
+- `POST /api/v1/employees/{id}/skills/ai-accept`：人工勾选确认后写入画像（`source=RESUME/PROJECT/AI`、`verified=false`）；已有技能按确认结果更新，新技能插入。AI 不直接落库。
 
 ---
 
@@ -905,6 +911,14 @@ POST /api/v1/ai/project-plan
 }
 ```
 
+### 技能识别 API
+
+```text
+POST /api/v1/employees/{id}/skills/ai-extract   # 经历文本 → 技能草稿（不落库）
+POST /api/v1/employees/{id}/skills/ai-accept    # 人工确认后写入画像
+GET  /api/v1/employees/{id}/skills/evidence     # 历史任务技能证据
+```
+
 ### Solver API
 
 ```text
@@ -1100,7 +1114,7 @@ AI 解释方案
 
 - **Phase 1 — 基础 MVP**：Employee、Skill、Project、AI Planner、Skill Matching、Timefold Solver、Resource Plan
 - **Phase 2 — 增强项目资源管理**：多项目编排、资源 Timeline、Capacity Heatmap、项目资源冲突、多方案对比、能力 Gap 分析（进行中：技能级缺口分析与周度排期热力图已落地）
-- **Phase 3 — 自动能力画像**：简历解析、项目经历解析、历史任务分析、AI Skill Profile、技能自动更新
+- **Phase 3 — 自动能力画像**：简历解析、项目经历解析、历史任务分析、AI Skill Profile、技能自动更新（进行中：经历文本技能识别草稿、历史任务分析、人工确认写入画像已落地；语义相似度归一与技能自动更新待后续）
 - **Phase 4 — 动态重规划**：项目延期 / 人员请假 / 需求变化 / 优先级变化 / 新人加入时自动触发重新求解（Event → Impact Analysis → Solver → New Plan → AI 解释 → 人工确认）
 - **Phase 5 — 企业系统集成**：Jira、禅道、GitLab、GitHub、飞书、钉钉、企业微信、HR 系统、ERP、MES
 - **Phase 6 — 组织能力决策**：基于未来项目 Pipeline 做 Skill 供需 Gap 预测，输出招聘 / 培训 / 外包 / 调岗建议，演进为企业能力资源决策平台

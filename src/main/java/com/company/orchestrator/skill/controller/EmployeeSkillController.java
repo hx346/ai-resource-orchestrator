@@ -5,14 +5,18 @@ import java.util.List;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.company.orchestrator.common.result.Result;
+import com.company.orchestrator.skill.dto.AiSkillAcceptItem;
+import com.company.orchestrator.skill.dto.AiSkillExtractRequest;
 import com.company.orchestrator.skill.dto.EmployeeSkillUpsertRequest;
 import com.company.orchestrator.skill.dto.EmployeeSkillView;
+import com.company.orchestrator.skill.service.AiSkillProfileService;
 import com.company.orchestrator.skill.service.EmployeeSkillService;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -28,6 +32,7 @@ import lombok.RequiredArgsConstructor;
 public class EmployeeSkillController {
 
     private final EmployeeSkillService employeeSkillService;
+    private final AiSkillProfileService aiSkillProfileService;
 
     @Operation(summary = "查询员工技能画像 / List skills of an employee")
     @GetMapping
@@ -48,5 +53,23 @@ public class EmployeeSkillController {
     public Result<Void> clear(@PathVariable Long employeeId) {
         employeeSkillService.replaceAll(employeeId, List.of());
         return Result.ok();
+    }
+
+    @Operation(summary = "AI 从经历文本识别技能草稿（不落库）/ Extract a skill draft from experience text via AI (nothing persisted)")
+    @PostMapping("/ai-extract")
+    public Result<?> aiExtract(@PathVariable Long employeeId, @Valid @RequestBody AiSkillExtractRequest request) {
+        return Result.ok(aiSkillProfileService.extract(employeeId, request));
+    }
+
+    @Operation(summary = "人工确认草稿写入画像 / Merge human-confirmed draft items into the profile")
+    @PostMapping("/ai-accept")
+    public Result<Integer> aiAccept(@PathVariable Long employeeId, @Valid @RequestBody List<@Valid AiSkillAcceptItem> items) {
+        return Result.ok(aiSkillProfileService.accept(employeeId, items));
+    }
+
+    @Operation(summary = "历史任务技能证据 / Skill evidence from active allocations")
+    @GetMapping("/evidence")
+    public Result<?> evidence(@PathVariable Long employeeId) {
+        return Result.ok(aiSkillProfileService.evidence(employeeId));
     }
 }

@@ -80,5 +80,13 @@ test('gap analysis blocks confirmation and timeline renders weekly load',async({
   await page.getByRole('button',{name:/资源排期/}).click();
   await expect(page.getByRole('heading',{name:'全员负荷，一览无余。'})).toBeVisible();
   await expect(page.locator('.timeline-table tbody')).toContainText('陈知远');
+  await page.getByRole('button',{name:/团队成员/}).click();
+  await page.getByRole('button',{name:/陈知远/}).click();
+  await page.getByLabel('经历文本').fill('精通 Java，熟悉项目管理');
+  await page.getByRole('button',{name:/识别技能/}).click();
+  await expect(page.getByRole('heading',{name:/技能草稿/})).toBeVisible();
+  await expect(page.locator('.draft-skills')).toContainText('Java');
+  await page.getByRole('button',{name:/确认写入/}).click();
+  await expect(page.locator('.skill-grid')).toContainText('Java');
   expect(errors).toEqual([]);
 });
