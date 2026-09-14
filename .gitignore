@@ -70,3 +70,6 @@ replay_pid*
 
 # ---------- Claude Code local settings ----------
 .claude/settings.local.json
+
+# ---------- Host-built frontend artifacts (copied from web/dist for local packaging) ----------
+src/main/resources/static/
