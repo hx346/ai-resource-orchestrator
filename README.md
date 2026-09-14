@@ -719,7 +719,7 @@ solver_duration
 created_by / created_at
 ```
 
-允许保存多个方案（如方案A 最低风险 / 方案B 最低成本 / 方案C 最快交付）。
+允许保存多个方案（如方案A 最低风险 / 方案B 最低成本 / 方案C 最快交付）。已支持同一项目任意两个方案版本并排对比（`GET /api/v1/resource-plans/compare`，前端高亮人员变化）。
 
 **AIExecution**
 
@@ -915,7 +915,7 @@ POST /api/v1/projects/{projectId}/solve
 }
 ```
 
-预留策略：`BALANCED` / `FASTEST` / `LOWEST_COST` / `LOWEST_RISK` / `BEST_SKILL_MATCH`，第一阶段真正实现 `BALANCED`，其余作为未来扩展。
+已实现策略：`BALANCED`（平衡，默认）/ `BEST_SKILL_MATCH`（技能优先，技能匹配权重 ×4）/ `LOWEST_RISK`（负载均衡，单人任务占用合计超过 60% 时软惩罚，鼓励分散）。`FASTEST` / `LOWEST_COST` 为未来扩展。
 
 ### AI Streaming
 

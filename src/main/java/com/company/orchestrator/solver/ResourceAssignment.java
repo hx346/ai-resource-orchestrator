@@ -12,5 +12,7 @@ public class ResourceAssignment {
     private Work task;
     @ValueRangeProvider(id="candidates") private List<Candidate> candidates;
     @PlanningVariable(valueRangeProviderRefs="candidates",nullable=true) private Candidate candidate;
-    public ResourceAssignment(Work task,List<Candidate> candidates) { this.id=task.id(); this.task=task; this.candidates=candidates; }
+    private Weights weights;
+    public ResourceAssignment(Work task,List<Candidate> candidates) { this(task,candidates,Weights.of("BALANCED")); }
+    public ResourceAssignment(Work task,List<Candidate> candidates,Weights weights) { this.id=task.id(); this.task=task; this.candidates=candidates; this.weights=weights; }
 }

@@ -38,13 +38,24 @@ class ResourceSolverTest {
         assertThat(solution.getScore().isFeasible()).isTrue();
         assertThat(solution.getAssignments()).allMatch(a -> a.getCandidate()!=null);
     }
+    @Test void strategyWeightsStayFeasibleAndAssign() {
+        // SKILL_MATCH / LOWEST_RISK 只改变软约束权重：仍应可行且优先分配而非留缺口 / strategies alter soft weights only
+        for(var strategy : List.of("BEST_SKILL_MATCH","LOWEST_RISK")) {
+            var i=input(List.of(work(1,4),work(2,4)),List.of(),List.of());
+            var weights=Weights.of(strategy);
+            var solution=solve(new ResourceSolution(i.tasks().stream().map(t -> new ResourceAssignment(t,matcher.candidates(i,t),weights)).toList()));
+            assertThat(solution.getScore().isFeasible()).isTrue();
+            assertThat(solution.getAssignments()).allMatch(a -> a.getCandidate()!=null);
+        }
+    }
     @Test void emptyCandidateRangeProducesGap() {
         var solution=solve(input(List.of(work(1,9)),List.of(),List.of()));
         assertThat(solution.getScore().isFeasible()).isTrue();
         assertThat(solution.getAssignments().getFirst().getCandidate()).isNull();
     }
-    private ResourceSolution solve(Input i) {
+    private ResourceSolution solve(Input i) { return solve(new ResourceSolution(i.tasks().stream().map(t -> new ResourceAssignment(t,matcher.candidates(i,t))).toList())); }
+    private ResourceSolution solve(ResourceSolution initial) {
         var config=new SolverConfig().withSolutionClass(ResourceSolution.class).withEntityClasses(ResourceAssignment.class).withConstraintProviderClass(ResourceConstraints.class).withTerminationSpentLimit(Duration.ofMillis(150));
-        return SolverFactory.<ResourceSolution>create(config).buildSolver().solve(new ResourceSolution(i.tasks().stream().map(t -> new ResourceAssignment(t,matcher.candidates(i,t))).toList()));
+        return SolverFactory.<ResourceSolution>create(config).buildSolver().solve(initial);
     }
 }

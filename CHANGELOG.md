@@ -41,4 +41,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dev: Vite dev proxy target configurable via `BACKEND_ORIGIN` / 前端开发代理目标支持环境变量.
 - Team capacity timeline: `GET /api/v1/allocations/timeline` aggregates PLANNED/CONFIRMED bookings into Monday-based weeks (27-week horizon) for every active employee; the frontend adds a 资源排期 tab with a weekly load heatmap and per-week booking tooltips / 全员周负荷时间线与热力图.
 - Tests: E2E scenario covering gap handling (an unassignable task blocks confirmation) and timeline rendering; smoke suite checks the timeline endpoint / 缺口与排期的端到端测试覆盖.
+- Solving strategies: `BALANCED` / `BEST_SKILL_MATCH` (skill-match weight ×4) / `LOWEST_RISK` (soft penalty above 60% per-person load concentration); strategies are validated (unknown → 400), persisted on the plan, and selectable in the solve form / 多策略求解.
+- Plan comparison: `GET /api/v1/resource-plans/compare?left=&right=` returns a per-task assignment diff plus score/gap summary for two plans of the same project; the frontend renders them side by side with changed rows highlighted / 方案并排对比.
 

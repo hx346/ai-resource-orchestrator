@@ -81,6 +81,15 @@ def main():
     a.call(f'/resource-plans/{second}/confirm','POST',status=409)
     a.call(f'/resource-plans/{second}/cancel','POST')
     print('PASS: real Timefold matching, manual edit, review, idempotent confirmation, stale draft rejection and cancellation')
+    # Strategies and side-by-side comparison / 多策略求解与方案对比。
+    skill_first=a.call(f'/projects/{pid}/solve','POST',{'strategy':'BEST_SKILL_MATCH'})
+    low_risk=a.call(f'/projects/{pid}/solve','POST',{'strategy':'LOWEST_RISK'})
+    a.call(f'/projects/{pid}/solve','POST',{'strategy':'FASTEST'},status=400)
+    diff=a.call(f'/resource-plans/compare?left={skill_first}&right={low_risk}')
+    assert len(diff['rows'])==3 and diff['left']['strategy']=='BEST_SKILL_MATCH' and diff['right']['strategy']=='LOWEST_RISK',diff
+    assert all(r['left'] and r['right'] and not r['right'].get('gap') for r in diff['rows']),diff['rows']
+    a.call(f'/resource-plans/{skill_first}/cancel','POST');a.call(f'/resource-plans/{low_risk}/cancel','POST')
+    print('PASS: solving strategies validated and plans compared')
     gap_project=a.call('/projects','POST',{**project,'name':'Gap '+suffix})
     a.call(f'/projects/{gap_project}/tasks','POST',{'name':'Impossible workload','startDate':'2026-10-05','endDate':'2026-10-05','estimatedHours':10000})
     gap_id=a.call(f'/projects/{gap_project}/solve','POST',{'strategy':'BALANCED'})

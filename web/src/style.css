@@ -6,3 +6,6 @@
 .legend{display:flex;gap:8px;align-items:center;font-size:10px;color:var(--muted)}
 .legend .heat{padding:4px 10px;border-radius:4px}
 @media(max-width:760px){nav{grid-template-columns:repeat(5,1fr)}}
+/* ---------- Phase 2: plan comparison / 方案对比 ---------- */
+.compare{margin-top:22px;border:1px solid var(--line);border-radius:8px;padding:18px;background:#fbfcf8}
+.compare td.changed{color:#a17536;font-weight:600}

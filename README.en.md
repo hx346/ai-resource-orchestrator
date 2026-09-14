@@ -922,7 +922,7 @@ Parameters:
 }
 ```
 
-Reserved strategies: `BALANCED` / `FASTEST` / `LOWEST_COST` / `LOWEST_RISK` / `BEST_SKILL_MATCH`. Phase 1 implements `BALANCED` only; the rest are future extensions.
+Implemented strategies: `BALANCED` (default) / `BEST_SKILL_MATCH` (skill-match weight ×4) / `LOWEST_RISK` (soft penalty when one person's total allocation exceeds 60%, encouraging distribution). `FASTEST` / `LOWEST_COST` remain future extensions.
 
 ### AI Streaming
 

@@ -27,20 +27,21 @@ public class ResourcePlanService {
     }
     @Transactional(rollbackFor=Exception.class,isolation=Isolation.REPEATABLE_READ)
     public long solve(long projectId,String strategy,String username) {
-        if(!"BALANCED".equals(strategy)) bad("当前仅支持 BALANCED 策略");
+        if(!Weights.STRATEGIES.contains(strategy)) bad("不支持的策略："+strategy+"，可选 "+Weights.STRATEGIES.stream().sorted().toList());
+        var weights=Weights.of(strategy);
         // Serialize version allocation per project; confirmation will revalidate the input snapshot.
         db.queryForList("select id from project where id=? for update",projectId);
         if(db.queryForObject("select count(*) from resource_allocation where project_id=? and status in ('CONFIRMED','PLANNED')",Long.class,projectId)>0) bad("项目已有生效分配，请先撤销该方案");
         var input=repository.load(projectId);
-        var initial=new ResourceSolution(input.tasks().stream().map(t -> new ResourceAssignment(t,candidates.candidates(input,t))).toList());
+        var initial=new ResourceSolution(input.tasks().stream().map(t -> new ResourceAssignment(t,candidates.candidates(input,t),weights)).toList());
         var config=new SolverConfig().withSolutionClass(ResourceSolution.class).withEntityClasses(ResourceAssignment.class)
             .withConstraintProviderClass(ResourceConstraints.class).withTerminationSpentLimit(Duration.ofSeconds(2));
         long started=System.nanoTime();
         ResourceSolution solution=SolverFactory.<ResourceSolution>create(config).buildSolver().solve(initial);
         if(!solution.getScore().isFeasible()) bad("未找到满足硬约束的方案");
         int version=db.queryForObject("select coalesce(max(version),0)+1 from resource_plan where project_id=?",Integer.class,projectId);
-        long id=db.queryForObject("insert into resource_plan(project_id,version,strategy,score_text,input_hash,solver_duration,created_by) values (?,?,'BALANCED',?,?,?,(select id from sys_user where username=?)) returning id",Long.class,
-            projectId,version,solution.getScore().toString(),input.hash(),(System.nanoTime()-started)/1_000_000,username);
+        long id=db.queryForObject("insert into resource_plan(project_id,version,strategy,score_text,input_hash,solver_duration,created_by) values (?,?,?,?,?,?,(select id from sys_user where username=?)) returning id",Long.class,
+            projectId,version,strategy,solution.getScore().toString(),input.hash(),(System.nanoTime()-started)/1_000_000,username);
         saveItems(id,projectId,solution.getAssignments(),input);
         return id;
     }
@@ -52,7 +53,29 @@ public class ResourcePlanService {
         try { var gaps=json.readTree(result.get("gaps").toString()); result.put("gaps",gaps); result.put("gapSummary",GapAnalysis.summarize(gaps)); } catch(Exception ex) { throw new IllegalStateException(ex); }
         return result;
     }
-    public List<Map<String,Object>> list(long projectId) { return db.queryForList("select id,version,status,score_text,created_at from resource_plan where project_id=? order by version desc",projectId); }
+    public List<Map<String,Object>> list(long projectId) { return db.queryForList("select id,version,strategy,status,score_text,created_at from resource_plan where project_id=? order by version desc",projectId); }
+    /** Side-by-side comparison of two plans of the same project: per-task assignment plus score/gap summary. / 同项目两方案并排对比。 */
+    @SuppressWarnings("unchecked")
+    public Map<String,Object> compare(long leftId,long rightId) {
+        var left=get(leftId); var right=get(rightId);
+        if(!left.get("project_id").equals(right.get("project_id"))) bad("只能对比同一项目的方案");
+        var rows=new LinkedHashMap<Long,Map<String,Object>>();
+        for(var side:new Map<?,?>[]{left,right}) {
+            boolean isLeft=side==left;
+            for(var item:(List<Map<String,Object>>)side.get("items")) {
+                long taskId=((Number)item.get("task_id")).longValue();
+                rows.computeIfAbsent(taskId,k -> new LinkedHashMap<>(Map.of("taskId",k,"taskName",item.get("task_name"),"left",Map.of(),"right",Map.of())))
+                    .put(isLeft?"left":"right",Map.of("employeeName",item.get("employee_name"),"allocation",item.get("allocation")));
+            }
+            for(var gap:(com.fasterxml.jackson.databind.JsonNode)side.get("gaps")) {
+                long taskId=gap.get("taskId").asLong();
+                rows.computeIfAbsent(taskId,k -> new LinkedHashMap<>(Map.of("taskId",k,"taskName",gap.get("taskName").asText(),"left",Map.of(),"right",Map.of())))
+                    .put(isLeft?"left":"right",Map.of("gap",true));
+            }
+        }
+        java.util.function.Function<Map<String,Object>,Map<String,Object>> meta=p -> Map.of("id",p.get("id"),"version",p.get("version"),"strategy",p.get("strategy"),"score",p.get("score_text"),"status",p.get("status"),"gaps",((com.fasterxml.jackson.databind.JsonNode)p.get("gaps")).size());
+        return Map.of("left",meta.apply(left),"right",meta.apply(right),"rows",new ArrayList<>(rows.values()));
+    }
     public record Selection(long taskId,Long employeeId) {}
     @Transactional(rollbackFor=Exception.class)
     public void edit(long id,List<Selection> selections) {
