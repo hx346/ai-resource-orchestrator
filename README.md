@@ -965,6 +965,7 @@ psql -U postgres -c "CREATE DATABASE ai_resource_orchestrator;"
 
 # 2. 启动后端（Flyway 自动初始化数据库）
 ./mvnw spring-boot:run
+# 启动后访问 http://localhost:8080/swagger-ui.html 查看接口文档
 
 # 3. 启动前端
 cd web

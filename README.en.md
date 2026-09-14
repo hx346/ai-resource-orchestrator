@@ -972,6 +972,7 @@ psql -U postgres -c "CREATE DATABASE ai_resource_orchestrator;"
 
 # 2. Start the backend (Flyway initializes the schema automatically)
 ./mvnw spring-boot:run
+# API docs available at http://localhost:8080/swagger-ui.html after startup
 
 # 3. Start the frontend
 cd web

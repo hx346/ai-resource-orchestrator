@@ -2,6 +2,12 @@ spring:
   application:
     name: ai-resource-orchestrator
 
+  # Solver 域模型落地前排除 Timefold 自动装配，避免空求解配置导致启动失败；
+  # solver 模块开发时移除此排除。
+  # Exclude Timefold autoconfiguration until solver domain classes exist.
+  autoconfigure:
+    exclude: ai.timefold.solver.spring.boot.autoconfigure.TimefoldSolverAutoConfiguration
+
   datasource:
     url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:ai_resource_orchestrator}
     username: ${POSTGRES_USER:postgres}
@@ -14,6 +20,11 @@ spring:
     enabled: true
     locations: classpath:db/migration
     baseline-on-migrate: false
+
+  # i18n：按 Accept-Language 切换 zh-CN / en-US 文案，默认简体中文
+  messages:
+    basename: messages
+    encoding: UTF-8
 
   ai:
     openai:
