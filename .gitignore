@@ -57,5 +57,16 @@ tmp/
 coverage/
 web/test-results/
 web/playwright-report/
+web/blob-report/
+web/playwright/.cache/
 **/__pycache__/
 .flattened-pom.xml
+
+# ---------- JVM crash / heap dumps ----------
+hs_err_pid*
+replay_pid*
+*.hprof
+*.attach_pid*
+
+# ---------- Claude Code local settings ----------
+.claude/settings.local.json
