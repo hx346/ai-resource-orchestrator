@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.4.0] - 2026-09-15
 ### Added
 - Phase 3 remainder: resume file upload (`POST /employees/{id}/skills/ai-extract-file`, txt/md/docx/pdf via PDFBox + in-code docx unzip), deterministic similarity suggestions for unmatched skill names (`SkillSimilarity`, threshold 0.82), and automatic skill-update suggestions — evidence reports profile vs history-suggested levels with one-click adoption (`source=PROJECT`).
 - Phase 4 slice: dynamic replanning — `GET /projects/{id}/replan/impact` (five concrete conflict types), `POST /projects/{id}/replan` re-solves with the project's own bookings excluded, and `confirm()` atomically archives the previous active allocation set. Plain `solve` is rejected while allocations are active. Frontend plan panel gains impact-analysis and re-solve actions; E2E covers the leave → impact → replan → swap loop.
