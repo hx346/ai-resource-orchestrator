@@ -20,3 +20,6 @@
 .gantt-bar{position:absolute;top:7px;height:16px;border-radius:4px;background:#5d8267;z-index:1}
 .gantt-bar.p1{background:#a45a45}.gantt-bar.p2{background:#b08447}.gantt-bar.p4{background:#6d9267}.gantt-bar.p5{background:#4f7a63}
 .gantt-mark{position:absolute;top:5px;width:10px;height:10px;background:#c4a665;transform:rotate(45deg);z-index:3;border-radius:2px}
+/* ---------- Phase 2: cross-project load warnings / 跨项目负载预警 ---------- */
+.load-warn{background:#f8e3da;color:#a45a45}
+.load-warn small{color:#b07560}

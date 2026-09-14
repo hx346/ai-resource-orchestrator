@@ -65,6 +65,7 @@ def main():
     plan=a.call(f'/resource-plans/{plan_id}')
     assert not plan['gaps'] and len(plan['items'])==3,plan
     assert '0hard/' in plan['score_text']
+    assert plan['warnings'] and plan['warnings'][0]['load']>=80,plan['warnings']
     selections=[{'taskId':c['taskId'],'employeeId':c['candidates'][-1]['employeeId']} for c in candidates]
     a.call(f'/resource-plans/{plan_id}/items','PUT',selections)
     review=a.call(f'/resource-plans/{plan_id}/review','POST')

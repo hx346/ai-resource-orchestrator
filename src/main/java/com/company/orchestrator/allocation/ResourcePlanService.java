@@ -16,6 +16,8 @@ import com.company.orchestrator.common.exception.*;
 
 @Service @RequiredArgsConstructor
 public class ResourcePlanService {
+    /** Weekly cross-project load (percent) at which a plan carries a warning / 触发跨项目预警的周负载阈值。 */
+    private static final int WARN_LOAD=80;
     private final PlanningRepository repository;
     private final CandidateService candidates;
     private final JdbcTemplate db;
@@ -51,6 +53,27 @@ public class ResourcePlanService {
         var result=new LinkedHashMap<>(rows.getFirst());
         result.put("items",db.queryForList("select i.*,e.name employee_name,t.name task_name from resource_plan_item i join employee e on e.id=i.employee_id join task t on t.id=i.task_id where plan_id=? order by i.id",id));
         try { var gaps=json.readTree(result.get("gaps").toString()); result.put("gaps",gaps); result.put("gapSummary",GapAnalysis.summarize(gaps)); } catch(Exception ex) { throw new IllegalStateException(ex); }
+        result.put("warnings",warnings(id));
+        return result;
+    }
+    /** Cross-project weekly load warnings: this plan's items plus other projects' active allocations; any week >= 80% (bps) is flagged. / 跨项目周负载预警：本方案条目叠加其他项目生效分配，任一周 ≥80% 提示。 */
+    private List<Map<String,Object>> warnings(long planId) {
+        var own=db.queryForList("select i.employee_id,e.name employee_name,i.start_date,i.end_date,i.allocation from resource_plan_item i join employee e on e.id=i.employee_id where i.plan_id=?",planId);
+        if(own.isEmpty()) return List.of();
+        var others=db.queryForList("select a.employee_id,e.name employee_name,a.start_date,a.end_date,a.allocation from resource_allocation a join employee e on e.id=a.employee_id where a.status in ('PLANNED','CONFIRMED') and a.plan_id<>? and a.end_date>=current_date",planId);
+        var names=new LinkedHashMap<Long,String>(); var load=new HashMap<Long,TreeMap<String,Integer>>();
+        var today=java.time.LocalDate.now(); var first=today.minusDays(today.getDayOfWeek().getValue()-1);
+        for(var r:java.util.stream.Stream.concat(own.stream(),others.stream()).toList()) {
+            long employee=((Number)r.get("employee_id")).longValue();
+            names.putIfAbsent(employee,(String)r.get("employee_name"));
+            var start=java.time.LocalDate.parse(r.get("start_date").toString()); var end=java.time.LocalDate.parse(r.get("end_date").toString());
+            int allocation=((BigDecimal)r.get("allocation")).intValue();
+            for(var monday=first;!monday.isAfter(end);monday=monday.plusWeeks(1))
+                if(!end.isBefore(monday) && !start.isAfter(monday.plusDays(6))) load.computeIfAbsent(employee,k -> new TreeMap<>()).merge(monday.toString(),allocation,Integer::sum);
+        }
+        var result=new ArrayList<Map<String,Object>>();
+        load.forEach((employee,weeks) -> weeks.forEach((week,total) -> { if(total>=WARN_LOAD) result.add(Map.of("employeeId",employee,"employeeName",names.get(employee),"week",week,"load",total)); }));
+        result.sort((a,b) -> { int c=a.get("week").toString().compareTo(b.get("week").toString()); return c!=0?c:a.get("employeeName").toString().compareTo(b.get("employeeName").toString()); });
         return result;
     }
     public List<Map<String,Object>> list(long projectId) { return db.queryForList("select id,version,strategy,status,score_text,created_at from resource_plan where project_id=? order by version desc",projectId); }

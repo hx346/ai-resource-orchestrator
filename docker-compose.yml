@@ -17,7 +17,11 @@ services:
       retries: 5
 
   app:
-    build: .
+    build:
+      context: .
+      args:
+        # Optional Maven mirror for restricted networks (empty = Maven Central) / 受限网络下的 Maven 镜像，留空走中央仓库
+        MAVEN_MIRROR_URL: ${MAVEN_MIRROR_URL:-}
     container_name: aro-app
     depends_on:
       postgres:

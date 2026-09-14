@@ -12,6 +12,14 @@ RUN pnpm run build
 FROM maven:3.9-eclipse-temurin-25 AS build
 WORKDIR /build
 
+# Optional Maven mirror for restricted networks, e.g.
+#   docker compose build --build-arg MAVEN_MIRROR_URL=https://repo.huaweicloud.com/repository/maven
+# or set MAVEN_MIRROR_URL in .env (wired through docker-compose.yml build args).
+ARG MAVEN_MIRROR_URL=
+RUN if [ -n "$MAVEN_MIRROR_URL" ]; then mkdir -p /root/.m2 && \
+    printf '<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"><mirrors><mirror><id>build-mirror</id><mirrorOf>central</mirrorOf><url>%s</url></mirror></mirrors></settings>' \
+      "$MAVEN_MIRROR_URL" > /root/.m2/settings.xml; fi
+
 # Cache dependencies first
 COPY pom.xml .
 RUN mvn -q dependency:go-offline

@@ -45,4 +45,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Plan comparison: `GET /api/v1/resource-plans/compare?left=&right=` returns a per-task assignment diff plus score/gap summary for two plans of the same project; the frontend renders them side by side with changed rows highlighted / 方案并排对比.
 - Project Gantt: the project detail page renders a day-granularity task Gantt (sticky task names, weekend shading, priority-coloured bars, milestone diamonds; capped at 366 columns with a hint) / 项目甘特图.
 - Brand favicon (`web/public/favicon.svg`) with an explicit link in `index.html` / 站点图标.
+- Cross-project load warnings: plan details include `warnings` listing employees whose weekly load — this plan's items plus other projects' active allocations — reaches 80% or more; the warning block is rendered in the plan panel and feeds the AI review input as risk context / 跨项目周负载预警.
+- Docker build: optional `MAVEN_MIRROR_URL` build arg (Dockerfile + compose + `.env.example`) for networks where the build container cannot reach Maven Central reliably / 构建期 Maven 镜像可配置.
 

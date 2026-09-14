@@ -458,6 +458,10 @@ resource conflict + capability gap + switching + delay
 
 Weights are configurable in Phase 1.
 
+### Cross-project Load Warnings
+
+Plan details include **cross-project load warnings**: this plan's items plus other projects' active allocations are aggregated per week, and any employee reaching 80% or more in a week is listed (rendered as a warning block, and fed to the AI review input as risk context). The hint never blocks confirmation — hard constraints already prevent overbooking; the warning flags high-load risk.
+
 ---
 
 ## AI Review & Capability Gap Analysis
