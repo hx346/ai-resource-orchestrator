@@ -505,6 +505,11 @@ The AI can then generate suggestions: Option A internal transfer / Option B temp
 
 Phase 1 only produces suggestions; nothing is executed automatically.
 
+**Current implementation (v0.2 dev)**: a solved plan distinguishes two kinds of gaps—
+
+- **Skill gap**: no active employee in the company reaches the required level of a REQUIRED skill. Plan details include an aggregated "capability gap summary" (skill, required level, affected tasks, total hours, window, workdays) to support transfer / hiring / training decisions.
+- **Capacity/time conflict**: qualified people exist but lack time or capacity, so the task stays unassigned.
+
 ---
 
 ## Architecture

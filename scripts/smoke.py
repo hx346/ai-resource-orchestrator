@@ -88,6 +88,17 @@ def main():
     a.call(f'/resource-plans/{gap_id}/confirm','POST',status=400)
     a.call(f'/resource-plans/{gap_id}/cancel','POST')
     print('PASS: infeasible demand produces an explicit gap and cannot be confirmed')
+    # A task nobody can staff must report which skill is missing. / 无人可承担的任务须报告缺失技能。
+    rare=a.call('/skills','POST',{'name':'Smoke稀有技能 '+suffix,'categoryId':a.call('/skill-categories')[0]['id']})
+    skill_gap_project=a.call('/projects','POST',{**project,'name':'SkillGap '+suffix})
+    rare_task=a.call(f'/projects/{skill_gap_project}/tasks','POST',{'name':'无人可承担','startDate':'2026-10-05','endDate':'2026-10-05','estimatedHours':8})
+    a.call(f'/tasks/{rare_task}/skill-requirements','POST',{'skillId':rare,'minLevel':5,'weight':1,'requirementType':'REQUIRED'})
+    skill_gap_id=a.call(f'/projects/{skill_gap_project}/solve','POST',{'strategy':'BALANCED'})
+    detailed=a.call(f'/resource-plans/{skill_gap_id}')
+    assert detailed['gaps'][0]['skillGap'] and detailed['gaps'][0]['missingSkills'][0]['skillId']==rare,detailed['gaps']
+    assert detailed['gapSummary'][0]['taskCount']==1 and detailed['gapSummary'][0]['totalHours']==8,detailed['gapSummary']
+    a.call(f'/resource-plans/{skill_gap_id}/cancel','POST')
+    print('PASS: skill-level gap analysis reports missing skills and aggregation')
     # Exercise concurrent confirmation using independent cookie sessions.
     fresh=a.call(f'/projects/{pid}/solve','POST',{'strategy':'BALANCED'})
     peers=[Client(),Client()]

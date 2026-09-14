@@ -41,7 +41,7 @@ public class ResourcePlanService {
         int version=db.queryForObject("select coalesce(max(version),0)+1 from resource_plan where project_id=?",Integer.class,projectId);
         long id=db.queryForObject("insert into resource_plan(project_id,version,strategy,score_text,input_hash,solver_duration,created_by) values (?,?,'BALANCED',?,?,?,(select id from sys_user where username=?)) returning id",Long.class,
             projectId,version,solution.getScore().toString(),input.hash(),(System.nanoTime()-started)/1_000_000,username);
-        saveItems(id,projectId,solution.getAssignments());
+        saveItems(id,projectId,solution.getAssignments(),input);
         return id;
     }
     public Map<String,Object> get(long id) {
@@ -49,7 +49,7 @@ public class ResourcePlanService {
         if(rows.isEmpty()) throw new BusinessException(ErrorCode.BAD_REQUEST,"方案不存在");
         var result=new LinkedHashMap<>(rows.getFirst());
         result.put("items",db.queryForList("select i.*,e.name employee_name,t.name task_name from resource_plan_item i join employee e on e.id=i.employee_id join task t on t.id=i.task_id where plan_id=? order by i.id",id));
-        try { result.put("gaps",json.readTree(result.get("gaps").toString())); } catch(Exception ex) { throw new IllegalStateException(ex); }
+        try { var gaps=json.readTree(result.get("gaps").toString()); result.put("gaps",gaps); result.put("gapSummary",GapAnalysis.summarize(gaps)); } catch(Exception ex) { throw new IllegalStateException(ex); }
         return result;
     }
     public List<Map<String,Object>> list(long projectId) { return db.queryForList("select id,version,status,score_text,created_at from resource_plan where project_id=? order by version desc",projectId); }
@@ -72,7 +72,7 @@ public class ResourcePlanService {
         assignments.stream().filter(a -> a.getCandidate()!=null).forEach(a -> grouped.computeIfAbsent(a.getCandidate().employeeId(),k -> new ArrayList<>()).add(a));
         if(grouped.values().stream().anyMatch(a -> ResourceConstraints.excess(a)>0)) bad("人工调整导致人员超配");
         db.update("delete from resource_plan_item where plan_id=?",id);
-        saveItems(id,projectId,assignments);
+        saveItems(id,projectId,assignments,input);
         db.update("update resource_plan set score_text='MANUAL / feasible',updated_at=now() where id=?",id);
     }
     @Transactional(rollbackFor=Exception.class)
@@ -95,11 +95,20 @@ public class ResourcePlanService {
         db.update("update resource_allocation set status='CANCELLED',updated_at=now() where plan_id=?",id);
         db.update("update resource_plan set status='ARCHIVED',updated_at=now() where id=?",id);
     }
-    private void saveItems(long id,long projectId,List<ResourceAssignment> assignments) {
+    private void saveItems(long id,long projectId,List<ResourceAssignment> assignments,Input input) {
         var gaps=new ArrayList<Map<String,Object>>();
+        // 技能名称只在存在缺口时才查询 / resolve skill names only when gaps exist
+        Map<Long,String> skillNames=assignments.stream().anyMatch(a -> a.getCandidate()==null)
+            ? db.query("select id,name from skill order by id",rs -> { var names=new HashMap<Long,String>(); while(rs.next()) names.put(rs.getLong("id"),rs.getString("name")); return names; }) : Map.of();
         for(var a:assignments) {
             var t=a.getTask(); var c=a.getCandidate();
-            if(c==null) { gaps.add(Map.of("taskId",t.id(),"taskName",t.name(),"reason",a.getCandidates().isEmpty()?"无满足技能和容量的候选员工":"人员时间冲突，当前方案未分配")); continue; }
+            if(c==null) {
+                var missing=GapAnalysis.missingSkills(input,t);
+                gaps.add(Map.of("taskId",t.id(),"taskName",t.name(),"reason",a.getCandidates().isEmpty()?"无满足技能和容量的候选员工":"人员时间冲突，当前方案未分配",
+                    "skillGap",!missing.isEmpty(),"missingSkills",missing.stream().map(n -> Map.of("skillId",n.skillId(),"skillName",skillNames.getOrDefault(n.skillId(),"技能#"+n.skillId()),"requiredLevel",n.minLevel())).toList(),
+                    "hours",t.hours(),"start",t.start().toString(),"end",t.end().toString()));
+                continue;
+            }
             db.update("insert into resource_plan_item(plan_id,project_id,task_id,employee_id,start_date,end_date,allocation) values (?,?,?,?,?,?,?)",id,projectId,t.id(),c.employeeId(),t.start(),t.end(),BigDecimal.valueOf(c.allocation(),2));
         }
         try { db.update("update resource_plan set gaps=? where id=?",json.writeValueAsString(gaps),id); } catch(java.io.IOException ex) { throw new IllegalStateException(ex); }

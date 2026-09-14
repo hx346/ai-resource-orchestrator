@@ -34,3 +34,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Frontend MVP: Vue 3 + TS SPA (`App.vue` tab views, `EditDialog` forms), CSRF-aware fetch and SSE parsing in `api.ts`, zh-CN locale / 前端最小闭环.
 - Ops & tests: Dockerfile + docker-compose (app + PostgreSQL), Playwright E2E workflow spec, API smoke suite (`scripts/smoke.py`, demo mode) and LLM contract test (`scripts/llm_fixture.py` + `scripts/check_llm_contract.py`) / 部署与测试脚本.
 
+### Added (Phase 2 — in development / 第二阶段·进行中, dev branch)
+
+- Skill-level gap analysis: plan gaps now distinguish a true skill gap (no active employee reaches the required level of a REQUIRED skill) from a capacity/time conflict; per-task `missingSkills` and an aggregated `gapSummary` (skill, required level, task count, total hours, window, workdays) are returned with plan details and rendered in the frontend / 技能级缺口分析：区分技能缺口与时间容量冲突，输出缺失技能与聚合汇总。
+- Smoke suite covers the new gap classification and aggregation / 冒烟测试覆盖缺口分类与聚合.
+- Dev: Vite dev proxy target configurable via `BACKEND_ORIGIN` / 前端开发代理目标支持环境变量.
+
