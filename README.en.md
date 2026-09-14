@@ -852,7 +852,7 @@ Users can accept, edit, delete, or regenerate — **every AI output remains edit
 - **Center**: recommended people, skill match, current load, availability
 - **Right**: resource plan, risks, capability gaps, AI suggestions
 
-The "Timeline" tab provides a weekly team capacity timeline / heatmap (27-week horizon, green/amber/red load tiers, hover for booking details). Later additions: Gantt.
+The "Timeline" tab provides a weekly team capacity timeline / heatmap (27-week horizon, green/amber/red load tiers, hover for booking details); the project detail page renders a day-granularity task Gantt (weekend shading, priority-coloured bars, milestone diamonds).
 
 ### Roles & Permissions
 

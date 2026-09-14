@@ -43,4 +43,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Tests: E2E scenario covering gap handling (an unassignable task blocks confirmation) and timeline rendering; smoke suite checks the timeline endpoint / 缺口与排期的端到端测试覆盖.
 - Solving strategies: `BALANCED` / `BEST_SKILL_MATCH` (skill-match weight ×4) / `LOWEST_RISK` (soft penalty above 60% per-person load concentration); strategies are validated (unknown → 400), persisted on the plan, and selectable in the solve form / 多策略求解.
 - Plan comparison: `GET /api/v1/resource-plans/compare?left=&right=` returns a per-task assignment diff plus score/gap summary for two plans of the same project; the frontend renders them side by side with changed rows highlighted / 方案并排对比.
+- Project Gantt: the project detail page renders a day-granularity task Gantt (sticky task names, weekend shading, priority-coloured bars, milestone diamonds; capped at 366 columns with a hint) / 项目甘特图.
+- Brand favicon (`web/public/favicon.svg`) with an explicit link in `index.html` / 站点图标.
 

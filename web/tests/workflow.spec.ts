@@ -29,6 +29,7 @@ test('project → editable AI draft → solver → review → confirmation',asyn
   await page.getByRole('button',{name:'保存',exact:true}).click();
   await page.getByRole('button',{name:'确认导入任务'}).click();
   await expect(page.getByRole('button',{name:'确认需求范围',exact:true})).toBeVisible();
+  await expect(page.locator('.gantt-bar').first()).toBeVisible();
   await page.getByRole('button',{name:'生成资源方案'}).click();
   await expect(page.getByText('无未分配任务',{exact:true})).toBeVisible({timeout:30000});
   await page.getByRole('button',{name:'查看演示解释'}).click();
