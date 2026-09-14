@@ -32,3 +32,11 @@
 .draft-skills th,.draft-skills td{padding:6px 8px;text-align:left;vertical-align:top;font-size:11px}
 .draft-skills tr.off td{color:var(--muted)}
 .tags.evidence{margin:6px 0 0}
+
+/* ---------- Phase 3/4: resume upload, evidence adopt, impact list / 简历上传、证据采纳、影响分析 ---------- */
+.file-button{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border:1px solid var(--line);border-radius:8px;cursor:pointer;font-size:12px;background:#fff;color:inherit}
+.file-button:hover{border-color:#5d8267}
+.file-button input{display:none}
+.tags.evidence small{margin:0 4px;opacity:.75}
+.impact-list{background:#f6f0e2;color:#7a6335}
+.impact-list small{color:#93805a}

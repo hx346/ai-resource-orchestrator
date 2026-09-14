@@ -6,6 +6,12 @@ spring:
   autoconfigure:
     exclude: ai.timefold.solver.spring.boot.autoconfigure.TimefoldSolverAutoConfiguration
 
+  # 简历/文档上传解析的体积上限 / upload limits for resume parsing
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
+
   datasource:
     url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:ai_resource_orchestrator}
     username: ${POSTGRES_USER:postgres}

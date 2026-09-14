@@ -240,8 +240,10 @@ The final profile is always confirmed by the employee or their manager.
 **Current implementation (v0.3 dev)**:
 
 - `POST /api/v1/employees/{id}/skills/ai-extract`: submit resume / project-experience text; AI extracts a skill draft (name, L1-L5 level, confidence, rationale) normalized against the skill library by name/alias. `demo` mode uses deterministic keyword rules (nearest tier word, ASCII word boundaries) with no model calls.
+- `POST /api/v1/employees/{id}/skills/ai-extract-file`: upload a resume file (txt / md / docx / pdf, up to 5MB); the server extracts its text and feeds the same draft pipeline. In live mode unmatched names carry a deterministic similarity hint (normalized edit distance of at least 0.82 — a suggestion, never an automatic mapping).
 - `GET /api/v1/employees/{id}/skills/evidence`: historical task analysis — skill requirements aggregated from the employee's active allocations (project count, total hours, last used), shown as profile evidence.
 - `POST /api/v1/employees/{id}/skills/ai-accept`: writes human-checked items into the profile (`source=RESUME/PROJECT/AI`, `verified=false`); existing skills are updated, new ones inserted. AI never persists directly.
+- **Automatic skill-update suggestions**: the evidence endpoint also reports profile level vs the level suggested by history; when the profile is missing or lags behind, the UI offers one-click adoption (`source=PROJECT`) — profiles can follow project history while confirmation stays human.
 
 ---
 
@@ -463,6 +465,24 @@ resource conflict + capability gap + switching + delay
 ```
 
 Weights are configurable in Phase 1.
+
+### Dynamic Replanning
+
+When base data changes during execution (leave, task/skill adjustments, deactivated members, project window shifts), the system supports an event-driven replan loop:
+
+```text
+Event (leave / change / deactivation)
+   ↓
+Impact analysis  GET /api/v1/projects/{id}/replan/impact
+   ↓
+Re-solve         POST /api/v1/projects/{id}/replan (own bookings excluded)
+   ↓
+Compare old vs new (reuses the comparison view)
+   ↓
+Human confirm → atomic swap (old plan archived, allocations replaced)
+```
+
+Impact analysis reports five concrete conflict types: `UNAVAILABLE` (leave/blocked window overlapping an allocation, same rule as the solver), `EMPLOYEE_INACTIVE`, `TASK_DRIFT`, `SKILL_DRIFT`, and `PROJECT_WINDOW`. While active allocations exist, plain `solve` is rejected in favor of `replan`; confirming the new plan archives the old set within the same transaction, so a project always has exactly one active allocation set.
 
 ### Cross-project Load Warnings
 
@@ -918,6 +938,13 @@ Response:
 }
 ```
 
+### Replanning API
+
+```text
+GET  /api/v1/projects/{id}/replan/impact   # change impact analysis (five conflict types)
+POST /api/v1/projects/{id}/replan          # re-solve against current data (new draft)
+```
+
 ### Skill Recognition API
 
 ```text
@@ -1121,8 +1148,8 @@ Once this loop runs end to end, the MVP is a success.
 
 - **Phase 1 — Foundation MVP**: Employee, Skill, Project, AI Planner, Skill Matching, Timefold Solver, Resource Plan
 - **Phase 2 — Richer resource management**: multi-project orchestration, resource timeline, capacity heatmap, cross-project conflicts, plan comparison, capability gap analysis (in progress: skill-level gap analysis and the weekly capacity timeline are shipped)
-- **Phase 3 — Automated skill profiles**: resume parsing, project history parsing, historical task analysis, AI skill profile, automatic skill updates (in progress: experience-text skill drafts, historical task analysis, and human-confirmed profile writes are shipped; semantic-similarity normalization and automatic skill updates come later)
-- **Phase 4 — Dynamic replanning**: automatically re-solve on delays / leave / requirement changes / priority changes / new hires (Event → Impact Analysis → Solver → New Plan → AI explanation → Human confirmation)
+- **Phase 3 — Automated skill profiles**: resume parsing, project history parsing, historical task analysis, AI skill profile, automatic skill updates (core shipped: text/file draft extraction + normalization with similarity hints + history-evidence adoption; vector semantic search waits for the pgvector phase)
+- **Phase 4 — Dynamic replanning**: automatically re-solve on delays / leave / requirement changes / priority changes / new hires (Event → Impact Analysis → Solver → New Plan → AI explanation → Human confirmation) (in progress: impact analysis + replan solving + atomic swap confirmation shipped; automatic event triggers and AI diff explanations come later)
 - **Phase 5 — Enterprise integrations**: Jira, ZenTao, GitLab, GitHub, Feishu, DingTalk, WeCom, HR systems, ERP, MES
 - **Phase 6 — Organizational capability decisions**: skill supply/demand gap forecasting based on the future project pipeline, with hiring / training / outsourcing / transfer suggestions — evolving into an enterprise resource intelligence platform
 

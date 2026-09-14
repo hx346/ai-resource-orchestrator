@@ -30,11 +30,28 @@ public class ResourcePlanService {
     @Transactional(rollbackFor=Exception.class,isolation=Isolation.REPEATABLE_READ)
     public long solve(long projectId,String strategy,String username) {
         if(!Weights.STRATEGIES.contains(strategy)) bad("不支持的策略："+strategy+"，可选 "+Weights.STRATEGIES.stream().sorted().toList());
-        var weights=Weights.of(strategy);
         // Serialize version allocation per project; confirmation will revalidate the input snapshot.
         db.queryForList("select id from project where id=? for update",projectId);
-        if(db.queryForObject("select count(*) from resource_allocation where project_id=? and status in ('CONFIRMED','PLANNED')",Long.class,projectId)>0) bad("项目已有生效分配，请先撤销该方案");
-        var input=repository.load(projectId);
+        if(db.queryForObject("select count(*) from resource_allocation where project_id=? and status in ('CONFIRMED','PLANNED')",Long.class,projectId)>0) bad("项目已有生效分配，请使用重新求解（重规划）生成替代方案，或先撤销现有方案");
+        return solveAndPersist(projectId,strategy,repository.load(projectId),username);
+    }
+
+    /**
+     * 动态重规划：保留旧方案生效的同时按当前基础数据重新求解（快照剔除本项目自身占用），
+     * 确认新方案时才原子换班。对应链路 Event → Impact → Solver → 新方案 → 人工确认。
+     * Dynamic replanning: re-solve against current data while the old set
+     * stays active (own bookings excluded); confirming the new plan swaps atomically.
+     */
+    @Transactional(rollbackFor=Exception.class,isolation=Isolation.REPEATABLE_READ)
+    public long replan(long projectId,String strategy,String username) {
+        if(!Weights.STRATEGIES.contains(strategy)) bad("不支持的策略："+strategy+"，可选 "+Weights.STRATEGIES.stream().sorted().toList());
+        db.queryForList("select id from project where id=? for update",projectId);
+        if(db.queryForObject("select count(*) from resource_allocation where project_id=? and status in ('CONFIRMED','PLANNED')",Long.class,projectId)==0) bad("项目没有生效分配，请直接生成资源方案");
+        return solveAndPersist(projectId,strategy,repository.load(projectId,projectId),username);
+    }
+
+    private long solveAndPersist(long projectId,String strategy,Input input,String username) {
+        var weights=Weights.of(strategy);
         var initial=new ResourceSolution(input.tasks().stream().map(t -> new ResourceAssignment(t,candidates.candidates(input,t),weights)).toList());
         var config=new SolverConfig().withSolutionClass(ResourceSolution.class).withEntityClasses(ResourceAssignment.class)
             .withConstraintProviderClass(ResourceConstraints.class).withTerminationSpentLimit(Duration.ofSeconds(2));
@@ -46,6 +63,55 @@ public class ResourcePlanService {
             projectId,version,strategy,solution.getScore().toString(),input.hash(),(System.nanoTime()-started)/1_000_000,username);
         saveItems(id,projectId,solution.getAssignments(),input);
         return id;
+    }
+
+    /** 变更影响分析：生效分配 × 当前基础数据的具体冲突（休假/停用/任务漂移/技能要求/项目周期），不依赖全局哈希 / concrete conflicts of the active allocation set. */
+    @Transactional(readOnly=true)
+    public Map<String,Object> impact(long projectId) {
+        var active=db.queryForList("select id,version from resource_plan where project_id=? and status='CONFIRMED' order by version desc limit 1",projectId);
+        if(active.isEmpty()) bad("项目没有已确认生效的方案，无需影响分析");
+        long planId=((Number)active.getFirst().get("id")).longValue();
+        var conflicts=new ArrayList<Map<String,Object>>();
+        // 与求解器同规则：非 AVAILABLE 窗口即容量清零 / same rule as the solver: non-AVAILABLE windows zero out capacity
+        db.queryForList("""
+            select a.employee_id,e.name employee_name,a.task_id,t.name task_name,a.start_date a_start,a.end_date a_end,w.type w_type,w.start_date w_start,w.end_date w_end
+            from resource_allocation a join employee e on e.id=a.employee_id join task t on t.id=a.task_id
+            join employee_availability w on w.employee_id=a.employee_id and w.type<>'AVAILABLE' and w.start_date<=a.end_date and w.end_date>=a.start_date
+            where a.plan_id=? and a.status='CONFIRMED' order by a.id""",planId)
+            .forEach(r -> conflicts.add(conflict("UNAVAILABLE",r,"分配 %s→%s 与 %s 窗口 %s→%s 重叠，期间容量清零".formatted(r.get("a_start"),r.get("a_end"),r.get("w_type"),r.get("w_start"),r.get("w_end")))));
+        db.queryForList("""
+            select a.employee_id,e.name employee_name,a.task_id,t.name task_name
+            from resource_allocation a join employee e on e.id=a.employee_id join task t on t.id=a.task_id
+            where a.plan_id=? and a.status='CONFIRMED' and e.status<>'ACTIVE'""",planId)
+            .forEach(r -> conflicts.add(conflict("EMPLOYEE_INACTIVE",r,"成员当前状态非 ACTIVE，无法继续承担分配")));
+        db.queryForList("""
+            select a.employee_id,e.name employee_name,a.task_id,t.name task_name,a.start_date a_start,a.end_date a_end,t.start_date t_start,t.end_date t_end,t.status t_status
+            from resource_allocation a join task t on t.id=a.task_id join employee e on e.id=a.employee_id
+            where a.plan_id=? and a.status='CONFIRMED' and (a.start_date<>t.start_date or a.end_date<>t.end_date or t.status in ('CANCELLED','DONE'))""",planId)
+            .forEach(r -> conflicts.add(conflict("TASK_DRIFT",r,"任务日期/状态已变化：分配 %s→%s，任务现为 %s→%s（%s）".formatted(r.get("a_start"),r.get("a_end"),r.get("t_start"),r.get("t_end"),r.get("t_status")))));
+        db.queryForList("""
+            select a.employee_id,e.name employee_name,r.task_id,t.name task_name,s.name skill_name,r.min_level,coalesce(es.level,0) current_level
+            from resource_allocation a join task_skill_requirement r on r.task_id=a.task_id and r.requirement_type='REQUIRED'
+            join skill s on s.id=r.skill_id join employee e on e.id=a.employee_id join task t on t.id=a.task_id
+            left join employee_skill es on es.employee_id=a.employee_id and es.skill_id=r.skill_id
+            where a.plan_id=? and a.status='CONFIRMED' and (s.status<>'ACTIVE' or coalesce(es.level,0)<r.min_level)""",planId)
+            .forEach(r -> conflicts.add(conflict("SKILL_DRIFT",r,"%s 要求 L%s，成员当前 L%s（技能或画像已变化）".formatted(r.get("skill_name"),r.get("min_level"),r.get("current_level")))));
+        db.queryForList("""
+            select a.employee_id,e.name employee_name,a.task_id,t.name task_name,a.start_date a_start,a.end_date a_end
+            from resource_allocation a join task t on t.id=a.task_id join employee e on e.id=a.employee_id, project p
+            where p.id=? and a.plan_id=? and a.status='CONFIRMED' and (a.start_date<p.start_date or a.end_date>p.end_date)""",projectId,planId)
+            .forEach(r -> conflicts.add(conflict("PROJECT_WINDOW",r,"项目周期已变化，分配 %s→%s 落在窗口之外".formatted(r.get("a_start"),r.get("a_end")))));
+        return Map.of("planId",planId,"version",((Number)active.getFirst().get("version")).intValue(),"conflicts",conflicts,"conflictCount",conflicts.size());
+    }
+
+    private Map<String,Object> conflict(String type,Map<String,Object> row,String detail) {
+        var result=new LinkedHashMap<String,Object>();
+        result.put("type",type);
+        result.put("employeeId",((Number)row.get("employee_id")).longValue());
+        result.put("employeeName",row.get("employee_name"));
+        if(row.get("task_id")!=null) { result.put("taskId",((Number)row.get("task_id")).longValue()); result.put("taskName",row.get("task_name")); }
+        result.put("detail",detail);
+        return result;
     }
     public Map<String,Object> get(long id) {
         var rows=db.queryForList("select * from resource_plan where id=?",id);
@@ -129,7 +195,9 @@ public class ResourcePlanService {
         requireDraft(plan); requireFresh(plan,repository.hash());
         if(!"[]".equals(plan.get("gaps").toString())) bad("方案仍有未分配任务，不能确认");
         long projectId=((Number)plan.get("project_id")).longValue();
-        if(db.queryForObject("select count(*) from resource_allocation where project_id=? and status in ('CONFIRMED','PLANNED')",Long.class,projectId)>0) bad("项目已有生效分配");
+        // 重规划换班：确认新方案时原子归档本项目旧生效分配与方案 / atomic swap: archive the previous active set while confirming a replacement
+        db.update("update resource_allocation set status='CANCELLED',updated_at=now() where project_id=? and status in ('CONFIRMED','PLANNED') and plan_id<>?",projectId,id);
+        db.update("update resource_plan set status='ARCHIVED',updated_at=now() where project_id=? and status='CONFIRMED' and id<>?",projectId,id);
         db.update("insert into resource_allocation(project_id,task_id,employee_id,start_date,end_date,allocation,status,plan_id) select project_id,task_id,employee_id,start_date,end_date,allocation,'CONFIRMED',plan_id from resource_plan_item where plan_id=?",id);
         db.update("update resource_plan set status='CONFIRMED',updated_at=now() where id=?",id);
     }

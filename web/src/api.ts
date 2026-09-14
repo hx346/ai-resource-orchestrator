@@ -41,3 +41,11 @@ export async function streamPlan(id:number,onProgress:(text:string)=>void):Promi
   if(!result) throw new Error('生成中断，未保存任何任务，请重试');
   return result;
 }
+
+export async function apiForm(path:string,form:FormData):Promise<any> {
+  const t=csrf || await token();
+  const response=await fetch('/api/v1'+path,{method:'POST',headers:{[t.headerName]:t.token,'Accept-Language':'zh-CN'},body:form});
+  const body=await response.json();
+  if (!response.ok || body.code!=='OK') { if(response.status===401) window.dispatchEvent(new Event('session-expired')); throw new Error(body.message || '请求失败'); }
+  return body.data;
+}

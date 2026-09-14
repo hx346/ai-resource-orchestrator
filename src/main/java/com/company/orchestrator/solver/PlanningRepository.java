@@ -11,7 +11,14 @@ import com.company.orchestrator.common.exception.*;
 @Repository @RequiredArgsConstructor
 public class PlanningRepository {
     private final JdbcTemplate db;
-    public Input load(long projectId) {
+    public Input load(long projectId) { return load(projectId,null); }
+
+    /**
+     * excludeBookingsOfProject 非空时，快照剔除该项目的生效占用——重规划是替换而非叠加。
+     * When excludeBookingsOfProject is set, the snapshot drops that project's
+     * own active bookings: a replan replaces the assignment set instead of stacking on it.
+     */
+    public Input load(long projectId,Long excludeBookingsOfProject) {
         var projects=db.queryForList("select * from project where id=?",projectId);
         if(projects.isEmpty()) throw new BusinessException(ErrorCode.PROJECT_NOT_FOUND,projectId);
         var project=projects.getFirst();
@@ -37,7 +44,8 @@ public class PlanningRepository {
         db.query("select es.* from employee_skill es join skill s on s.id=es.skill_id where s.status='ACTIVE' order by es.id",rs -> { skills.computeIfAbsent(rs.getLong("employee_id"),k -> new HashMap<>()).put(rs.getLong("skill_id"),rs.getInt("level")); });
         var people=db.query("select * from employee order by id",(rs,n) -> new Person(rs.getLong("id"),rs.getString("name"),rs.getInt("weekly_hours"),rs.getBigDecimal("default_capacity").movePointRight(2).intValue(),rs.getString("status"),skills.getOrDefault(rs.getLong("id"),Map.of())));
         var windows=db.query("select * from employee_availability order by id",(rs,n) -> new Window(rs.getLong("employee_id"),rs.getObject("start_date",LocalDate.class),rs.getObject("end_date",LocalDate.class),rs.getBigDecimal("capacity").movePointRight(2).intValue(),rs.getString("type")));
-        var bookings=db.query("select * from resource_allocation where status in ('PLANNED','CONFIRMED') order by id",(rs,n) -> new Booking(rs.getLong("employee_id"),rs.getObject("start_date",LocalDate.class),rs.getObject("end_date",LocalDate.class),rs.getBigDecimal("allocation").movePointRight(2).intValue()));
+        Object[] bookingArgs=excludeBookingsOfProject==null?new Object[0]:new Object[]{excludeBookingsOfProject};
+        var bookings=db.query("select * from resource_allocation where status in ('PLANNED','CONFIRMED')"+(excludeBookingsOfProject==null?"":" and project_id<>?")+" order by id",(rs,n) -> new Booking(rs.getLong("employee_id"),rs.getObject("start_date",LocalDate.class),rs.getObject("end_date",LocalDate.class),rs.getBigDecimal("allocation").movePointRight(2).intValue()),bookingArgs);
         return new Input(projectId,tasks,people,windows,bookings,hash());
     }
     public String hash() {

@@ -132,7 +132,30 @@ def main():
     profile={row['skillId']:row['level'] for row in a.call(f'/employees/{emp}/skills')}
     assert profile.get(matched[0]['skillId'])==5,profile
     a.call(f'/employees/{emp}/skills/ai-extract','POST',{'text':'普通文本','source':'MANAGER'},status=400)
+    # 技能自动更新建议：按历史任务证据补录缺失画像 / adopt missing profile skills from history evidence
+    a.call(f'/employees/{emp}/skills','PUT',[])
+    target=a.call(f'/employees/{emp}/skills/evidence')[0]
+    assert target['profile_level'] is None and target['suggested_level']>=3,target
+    a.call(f'/employees/{emp}/skills/ai-accept','POST',[{'skillId':target['skill_id'],'level':target['suggested_level'],'source':'PROJECT','confidence':0.8}])
+    assert {row['skillId']:row['level'] for row in a.call(f'/employees/{emp}/skills')}.get(target['skill_id'])==target['suggested_level']
     print('PASS: AI skill draft extraction, human-confirmed merge and history evidence')
+    # Phase 4: leave triggers impact analysis; replan swaps the active set atomically / 动态重规划
+    assert a.call(f'/projects/{pid}/replan/impact')['conflictCount']==0
+    item=fresh_plan['items'][0]
+    a.call(f'/employees/{item["employee_id"]}/availability','POST',{'startDate':item['start_date'],'endDate':item['end_date'],'type':'LEAVE','capacity':0,'remark':'smoke replan'})
+    impact=a.call(f'/projects/{pid}/replan/impact')
+    assert impact['conflictCount']>=1 and any(c['type']=='UNAVAILABLE' for c in impact['conflicts']),impact
+    replan_id=a.call(f'/projects/{pid}/replan','POST',{'strategy':'LOWEST_RISK'})
+    assert a.call(f'/resource-plans/{replan_id}')['status']=='DRAFT'
+    a.call(f'/projects/{pid}/solve','POST',{'strategy':'BALANCED'},status=400)
+    a.call(f'/resource-plans/{replan_id}/confirm','POST')
+    assert a.call(f'/resource-plans/{replan_id}')['status']=='CONFIRMED'
+    assert a.call(f'/resource-plans/{fresh}')['status']=='ARCHIVED'
+    assert a.call(f'/projects/{pid}/replan/impact')['conflictCount']==0
+    for row in a.call(f'/employees/{item["employee_id"]}/availability'):
+        if row['remark']=='smoke replan': a.call(f'/employees/{item["employee_id"]}/availability/{row["id"]}','DELETE')
+    a.call(f'/resource-plans/{replan_id}/cancel','POST')
+    print('PASS: leave triggers impact analysis, replan swaps the active allocation set atomically')
     a.call(f'/resource-plans/{fresh}/cancel','POST')
     print('PASS: concurrent duplicate confirmation is safe')
     print('ALL API SMOKE CHECKS PASSED; record suffix:',suffix)
