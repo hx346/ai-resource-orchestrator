@@ -39,4 +39,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Skill-level gap analysis: plan gaps now distinguish a true skill gap (no active employee reaches the required level of a REQUIRED skill) from a capacity/time conflict; per-task `missingSkills` and an aggregated `gapSummary` (skill, required level, task count, total hours, window, workdays) are returned with plan details and rendered in the frontend / 技能级缺口分析：区分技能缺口与时间容量冲突，输出缺失技能与聚合汇总。
 - Smoke suite covers the new gap classification and aggregation / 冒烟测试覆盖缺口分类与聚合.
 - Dev: Vite dev proxy target configurable via `BACKEND_ORIGIN` / 前端开发代理目标支持环境变量.
+- Team capacity timeline: `GET /api/v1/allocations/timeline` aggregates PLANNED/CONFIRMED bookings into Monday-based weeks (27-week horizon) for every active employee; the frontend adds a 资源排期 tab with a weekly load heatmap and per-week booking tooltips / 全员周负荷时间线与热力图.
+- Tests: E2E scenario covering gap handling (an unassignable task blocks confirmation) and timeline rendering; smoke suite checks the timeline endpoint / 缺口与排期的端到端测试覆盖.
 

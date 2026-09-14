@@ -73,7 +73,7 @@ Same-origin form-login sessions; every non-GET API call needs the CSRF token fro
 
 ### Frontend
 
-Deliberately minimal: `App.vue` is the whole app (tab views: projects/employees/skills/settings; project detail drives the workflow), `components/EditDialog.vue` for all forms, `api.ts` for CSRF + fetch + SSE parsing (`streamPlan` handles `progress`/`result`/`error` events). Sends `Accept-Language: zh-CN`.
+Deliberately minimal: `App.vue` is the whole app (tab views: projects/employees/skills/timeline/settings; project detail drives the workflow, the timeline tab renders `GET /api/v1/allocations/timeline` as a weekly capacity heatmap), `components/EditDialog.vue` for all forms, `api.ts` for CSRF + fetch + SSE parsing (`streamPlan` handles `progress`/`result`/`error` events). Sends `Accept-Language: zh-CN`.
 
 ## Conventions
 

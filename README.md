@@ -845,7 +845,7 @@ AI项目规划
 - **中间**：推荐人员、技能匹配度、当前负载、Availability
 - **右侧**：资源方案、风险、能力 Gap、AI 建议
 
-后续增加：Timeline、Gantt、Capacity Heatmap。
+「资源排期」页已提供按周聚合的全员 Capacity Timeline / Heatmap（27 周视野，绿/黄/红三档负荷，悬停查看项目占用明细）。后续增加：Gantt。
 
 ### 系统权限
 
@@ -1095,7 +1095,7 @@ AI 解释方案
 ## Roadmap
 
 - **Phase 1 — 基础 MVP**：Employee、Skill、Project、AI Planner、Skill Matching、Timefold Solver、Resource Plan
-- **Phase 2 — 增强项目资源管理**：多项目编排、资源 Timeline、Capacity Heatmap、项目资源冲突、多方案对比、能力 Gap 分析
+- **Phase 2 — 增强项目资源管理**：多项目编排、资源 Timeline、Capacity Heatmap、项目资源冲突、多方案对比、能力 Gap 分析（进行中：技能级缺口分析与周度排期热力图已落地）
 - **Phase 3 — 自动能力画像**：简历解析、项目经历解析、历史任务分析、AI Skill Profile、技能自动更新
 - **Phase 4 — 动态重规划**：项目延期 / 人员请假 / 需求变化 / 优先级变化 / 新人加入时自动触发重新求解（Event → Impact Analysis → Solver → New Plan → AI 解释 → 人工确认）
 - **Phase 5 — 企业系统集成**：Jira、禅道、GitLab、GitHub、飞书、钉钉、企业微信、HR 系统、ERP、MES

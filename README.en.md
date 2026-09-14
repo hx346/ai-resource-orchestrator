@@ -852,7 +852,7 @@ Users can accept, edit, delete, or regenerate — **every AI output remains edit
 - **Center**: recommended people, skill match, current load, availability
 - **Right**: resource plan, risks, capability gaps, AI suggestions
 
-Later additions: Timeline, Gantt, Capacity Heatmap.
+The "Timeline" tab provides a weekly team capacity timeline / heatmap (27-week horizon, green/amber/red load tiers, hover for booking details). Later additions: Gantt.
 
 ### Roles & Permissions
 
@@ -1102,7 +1102,7 @@ Once this loop runs end to end, the MVP is a success.
 ## Roadmap
 
 - **Phase 1 — Foundation MVP**: Employee, Skill, Project, AI Planner, Skill Matching, Timefold Solver, Resource Plan
-- **Phase 2 — Richer resource management**: multi-project orchestration, resource timeline, capacity heatmap, cross-project conflicts, plan comparison, capability gap analysis
+- **Phase 2 — Richer resource management**: multi-project orchestration, resource timeline, capacity heatmap, cross-project conflicts, plan comparison, capability gap analysis (in progress: skill-level gap analysis and the weekly capacity timeline are shipped)
 - **Phase 3 — Automated skill profiles**: resume parsing, project history parsing, historical task analysis, AI skill profile, automatic skill updates
 - **Phase 4 — Dynamic replanning**: automatically re-solve on delays / leave / requirement changes / priority changes / new hires (Event → Impact Analysis → Solver → New Plan → AI explanation → Human confirmation)
 - **Phase 5 — Enterprise integrations**: Jira, ZenTao, GitLab, GitHub, Feishu, DingTalk, WeCom, HR systems, ERP, MES

@@ -7,7 +7,9 @@ import com.company.orchestrator.common.result.Result;
 @RestController @RequestMapping("/api/v1") @RequiredArgsConstructor
 public class ResourcePlanController {
     private final ResourcePlanService service;
+    private final ResourceTimelineService timeline;
     public record SolveRequest(String strategy) {}
+    @GetMapping("/allocations/timeline") public Result<?> timeline() { return Result.ok(timeline.timeline()); }
     @GetMapping("/projects/{id}/candidates") public Result<?> candidates(@PathVariable long id) { return Result.ok(service.candidates(id)); }
     @PostMapping("/projects/{id}/solve") public Result<Long> solve(@PathVariable long id,@RequestBody(required=false) SolveRequest r,Principal p) { return Result.ok(service.solve(id,r==null||r.strategy()==null?"BALANCED":r.strategy(),p.getName())); }
     @GetMapping("/projects/{id}/resource-plans") public Result<?> list(@PathVariable long id) { return Result.ok(service.list(id)); }
