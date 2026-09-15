@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.4.1] - 2026-09-15
 ### Added
 - Phase 4 remainder: org-wide replan patrol (`GET /replan/alerts`, reuses the five conflict checks; nav badge and project-list banner, refreshed right after saving availability) and AI replan diff explanations (`POST /resource-plans/{id}/explain-diff`, deterministic in demo mode, audit type `REPLAN_EXPLAIN`).
 
