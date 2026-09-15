@@ -44,12 +44,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler({HttpMessageNotReadableException.class, MethodArgumentTypeMismatchException.class})
     public ResponseEntity<Result<Void>> handleUnreadable(Exception e) {
         log.warn("request body / param error: {}", e.getMessage());
-        return badRequest(resolve(ErrorCode.BAD_REQUEST, null));
+        return badRequest(resolve(ErrorCode.BAD_REQUEST, new Object[] {e.getMessage()}));
     }
 
     @ExceptionHandler(NoResourceFoundException.class)
     public ResponseEntity<Result<Void>> handleNoResource(NoResourceFoundException e) {
-        return badRequest(resolve(ErrorCode.BAD_REQUEST, null));
+        return notFound(resolve(ErrorCode.NOT_FOUND, new Object[] {e.getMessage()}));
     }
 
     @ExceptionHandler(DuplicateKeyException.class)
@@ -82,6 +82,11 @@ public class GlobalExceptionHandler {
     private ResponseEntity<Result<Void>> badRequest(String message) {
         return ResponseEntity.status(ErrorCode.BAD_REQUEST.httpStatus())
                 .body(Result.fail(ErrorCode.BAD_REQUEST.code(), message));
+    }
+
+    private ResponseEntity<Result<Void>> notFound(String message) {
+        return ResponseEntity.status(ErrorCode.NOT_FOUND.httpStatus())
+                .body(Result.fail(ErrorCode.NOT_FOUND.code(), message));
     }
 
     private String resolve(ErrorCode errorCode, Object[] args) {

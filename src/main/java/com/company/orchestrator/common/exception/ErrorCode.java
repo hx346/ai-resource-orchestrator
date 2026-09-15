@@ -18,6 +18,7 @@ public enum ErrorCode {
     AI_CANCELLED("E50303", "ai.cancelled", HttpStatus.SERVICE_UNAVAILABLE),
     AI_UPSTREAM_FAILED("E50201", "ai.upstream.failed", HttpStatus.BAD_GATEWAY),
 
+    NOT_FOUND("E40400", "error.not.found", HttpStatus.NOT_FOUND),
     EMPLOYEE_NOT_FOUND("E40401", "employee.not.found", HttpStatus.NOT_FOUND),
     DEPARTMENT_NOT_FOUND("E40402", "department.not.found", HttpStatus.NOT_FOUND),
     SKILL_NOT_FOUND("E40403", "skill.not.found", HttpStatus.NOT_FOUND),

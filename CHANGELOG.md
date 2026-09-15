@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed
+- LLM output parsing now strips reasoning-model `<think>…</think>` blocks (Qwen3 / DeepSeek-R1 style, truncated blocks tolerated) before JSON deserialization; shared `AiText.clean` replaces the duplicated fence-stripping in both AI planning and AI skill extraction.
+- Unreadable-body / param-type errors now fill the `请求参数错误：{0}` detail instead of returning a literal `{0}` placeholder; unmatched routes now return 404 `E40400` (`error.not.found`, path included) instead of 400.
 
 ## [0.6.1] - 2026-09-15
 ### Added
