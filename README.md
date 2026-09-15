@@ -557,9 +557,12 @@ NOTIFY_WEBHOOK_URL=https://... # 群机器人 webhook（日志中脱敏 query �
 Phase 6 第一片（只读分析，全部基于内部数据）：回答「缺什么能力、靠谁支撑、谁不可替代」。
 
 ```text
-GET /api/v1/capability/supply-demand?weeks=12   # 技能供需 Gap 预测（8/12/26 周）
-GET /api/v1/capability/key-people               # 关键能力节点（瓶颈技能持有人）
-GET /api/v1/capability/leave-impact?employeeId= # 核心人员离开影响（what-if）
+GET  /api/v1/capability/supply-demand?weeks=12   # 技能供需 Gap 预测（8/12/26 周）
+GET  /api/v1/capability/key-people               # 关键能力节点（瓶颈技能持有人）
+GET  /api/v1/capability/leave-impact?employeeId= # 核心人员离开影响（what-if）
+GET  /api/v1/capability/scenario?weeks=26        # Pipeline 情景模拟（待启动项目全部并行）
+GET  /api/v1/capability/trends                   # 缺口趋势：8/12/26 周三档对比
+POST /api/v1/capability/advise?weeks=12          # AI 缺口建议（招聘/培训/外包/调配，不决策）
 ```
 
 **供需口径（保守估计）**：
@@ -571,6 +574,12 @@ GET /api/v1/capability/leave-impact?employeeId= # 核心人员离开影响（wha
 **关键能力节点**：掌握瓶颈技能（全公司达标人数 ≤2）的人，附参与项目数与已占用工时——识别「哪些项目正在争夺相同的核心人员」。
 
 **离开影响（what-if）**：选定成员后列出其 12 周窗口内的生效任务，逐技能检查其他达标人数，标记可替代 / 不可替代——回答「核心人员离开，哪些项目会受伤」。
+
+**Pipeline 情景模拟**：把待启动（PLANNING）项目（或指定 `projectIds`）全部并行的技能缺口变化——窗口自动扩展覆盖所选项目周期，输出每技能「当前缺口 → 情景缺口 → 增量」——回答「未来同时启动这些项目，需要增加什么能力」。
+
+**缺口趋势**：8 / 12 / 26 周三档窗口的缺口人数对比——区分短期峰值与结构性短缺。
+
+**AI 建议**：对预测结果生成招聘 / 培训 / 外包 / 调配的分要点建议（demo 模式为确定性文案；live 走模型，审计 `CAPABILITY_ADVISE`），只解释、不决策。
 
 前端「能力决策」页签提供三块视图；分析不改变任何数据，决策始终由人做。
 
@@ -1187,7 +1196,7 @@ AI 解释方案
 - **Phase 3 — 自动能力画像**：简历解析、项目经历解析、历史任务分析、AI Skill Profile、技能自动更新（核心已落地：文本/文件识别草稿 + 归一化与相似度建议 + 历史证据采纳；向量语义检索留待 pgvector 阶段）
 - **Phase 4 — 动态重规划**：项目延期 / 人员请假 / 需求变化 / 优先级变化 / 新人加入时自动触发重新求解（Event → Impact Analysis → Solver → New Plan → AI 解释 → 人工确认）（核心已落地：影响分析 + 重规划求解 + 原子换班 + 全局巡检提醒 + 差异解释；自动触发求解与推送通知留待后续）
 - **Phase 5 — 企业系统集成**：Jira、禅道、GitLab、GitHub、飞书、钉钉、企业微信、HR 系统、ERP、MES（进行中：飞书 / 钉钉 / 企业微信 / 通用 webhook 出站通知已落地；Jira / 禅道 / GitLab 项目同步待后续）
-- **Phase 6 — 组织能力决策**：基于未来项目 Pipeline 做 Skill 供需 Gap 预测，输出招聘 / 培训 / 外包 / 调岗建议，演进为企业能力资源决策平台（进行中：供需 Gap 预测 + 关键能力节点 + 离开影响 what-if 已落地；Pipeline 情景模拟与 AI 建议生成待后续）
+- **Phase 6 — 组织能力决策**：基于未来项目 Pipeline 做 Skill 供需 Gap 预测，输出招聘 / 培训 / 外包 / 调岗建议，演进为企业能力资源决策平台（核心已落地：Gap 预测 + 关键能力节点 + 离开影响 + Pipeline 情景模拟 + 缺口趋势 + AI 建议；后续可演进按周分布的精化供给模型与外部市场数据）
 
 ### 长期方向
 

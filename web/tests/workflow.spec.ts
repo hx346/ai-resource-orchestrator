@@ -152,5 +152,9 @@ test('leave conflict triggers impact analysis and atomic replan swap',async({pag
   await page.getByRole('button',{name:/能力决策/}).click();
   await expect(page.getByRole('heading',{name:'看清组织的能力边界。'})).toBeVisible();
   await expect(page.locator('.sd-table tbody')).toContainText('Java');
+  await page.getByRole('button',{name:/缺口趋势/}).click();
+  await expect(page.locator('.trend-table')).toBeVisible();
+  await page.getByRole('button',{name:/生成建议/}).click();
+  await expect(page.locator('.review')).toContainText('演示规则说明');
   expect(errors).toEqual([]);
 });

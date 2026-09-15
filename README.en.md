@@ -563,9 +563,12 @@ NOTIFY_WEBHOOK_URL=https://... # group-bot webhook (query tokens masked in logs)
 First Phase 6 slice (read-only, entirely over internal data): what capabilities are missing, who carries them, and who is irreplaceable.
 
 ```text
-GET /api/v1/capability/supply-demand?weeks=12   # skill supply-demand gap forecast (8/12/26 weeks)
-GET /api/v1/capability/key-people               # key capability nodes (bottleneck-skill holders)
-GET /api/v1/capability/leave-impact?employeeId= # what-if impact if a person leaves
+GET  /api/v1/capability/supply-demand?weeks=12   # skill supply-demand gap forecast (8/12/26 weeks)
+GET  /api/v1/capability/key-people               # key capability nodes (bottleneck-skill holders)
+GET  /api/v1/capability/leave-impact?employeeId= # what-if impact if a person leaves
+GET  /api/v1/capability/scenario?weeks=26        # pipeline scenario (queued projects all start)
+GET  /api/v1/capability/trends                   # gap trend across 8/12/26-week windows
+POST /api/v1/capability/advise?weeks=12          # AI advice over the gaps (explains, never decides)
 ```
 
 **Supply/demand method (conservative)**:
@@ -577,6 +580,12 @@ GET /api/v1/capability/leave-impact?employeeId= # what-if impact if a person lea
 **Key capability nodes**: holders of bottleneck skills (at most 2 qualified people org-wide), with project counts and allocated hours — which projects compete for the same core people.
 
 **Leave impact (what-if)**: lists the person's active tasks in a 12-week window and checks other qualified people per skill, marking each task replaceable or not.
+
+**Pipeline scenario**: what changes when every queued (PLANNING) project — or an explicit `projectIds` set — runs in parallel; the window stretches to cover their horizons and each skill shows "base gap → scenario gap → delta".
+
+**Gap trends**: gap people compared across 8/12/26-week windows — separating short spikes from structural shortages.
+
+**AI advice**: bullet-point hiring / training / outsourcing / reassignment advice over the forecast (deterministic in demo mode; audited as `CAPABILITY_ADVISE` in live mode) — explanations, never decisions.
 
 The frontend "Capability" tab renders all three views; analytics never mutate data — decisions stay human.
 
@@ -1194,7 +1203,7 @@ Once this loop runs end to end, the MVP is a success.
 - **Phase 3 — Automated skill profiles**: resume parsing, project history parsing, historical task analysis, AI skill profile, automatic skill updates (core shipped: text/file draft extraction + normalization with similarity hints + history-evidence adoption; vector semantic search waits for the pgvector phase)
 - **Phase 4 — Dynamic replanning**: automatically re-solve on delays / leave / requirement changes / priority changes / new hires (Event → Impact Analysis → Solver → New Plan → AI explanation → Human confirmation) (core shipped: impact analysis + replan solving + atomic swap + org-wide patrol alerts + diff explanations; automatic solving triggers and push notifications come later)
 - **Phase 5 — Enterprise integrations**: Jira, ZenTao, GitLab, GitHub, Feishu, DingTalk, WeCom, HR systems, ERP, MES (in progress: Feishu / DingTalk / WeCom / generic outbound webhook notifications shipped; Jira / ZenTao / GitLab project sync comes later)
-- **Phase 6 — Organizational capability decisions**: skill supply/demand gap forecasting based on the future project pipeline, with hiring / training / outsourcing / transfer suggestions — evolving into an enterprise resource intelligence platform (in progress: supply-demand forecast + key capability nodes + leave-impact what-if shipped; pipeline scenario simulation and AI-generated suggestions come later)
+- **Phase 6 — Organizational capability decisions**: skill supply/demand gap forecasting based on the future project pipeline, with hiring / training / outsourcing / transfer suggestions — evolving into an enterprise resource intelligence platform (core shipped: gap forecast + key people + leave impact + pipeline scenarios + gap trends + AI advice; weekly-granular supply models and external market data are future refinements)
 
 ### Long-term Direction
 

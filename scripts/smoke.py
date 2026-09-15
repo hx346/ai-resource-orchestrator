@@ -119,7 +119,15 @@ def main():
     assert isinstance(a.call('/capability/key-people'),list)
     impact=a.call(f"/capability/leave-impact?employeeId={a.call('/employees')['list'][0]['id']}")
     assert impact['employeeName'] and isinstance(impact['affectedTasks'],list),impact
-    print(f"PASS: capability forecast ({sd['summary']['shortageSkills']}/{sd['summary']['skillsTracked']} skills short), key people, leave impact")
+    scenario=a.call('/capability/scenario')
+    assert isinstance(scenario['rows'],list) and isinstance(scenario['includedProjects'],list) and 'baseSummary' in scenario,scenario
+    if scenario['rows']:
+        assert set(scenario['rows'][0])>={'skillId','skillName','baseGapPeople','scenarioGapPeople','deltaPeople'},scenario['rows'][0]
+    trends=a.call('/capability/trends')
+    assert set(trends)>={'rows','summary'} and all(set(r)>={'skillName','w8','w12','w26'} for r in trends['rows']),trends
+    advise=a.call('/capability/advise?weeks=12','POST')
+    assert advise['mode']=='demo' and advise['text'],advise
+    print(f"PASS: capability forecast ({sd['summary']['shortageSkills']}/{sd['summary']['skillsTracked']} skills short), key people, leave impact, scenario, trends, advice")
     timeline=a.call('/allocations/timeline')
     assert timeline['weeks'] and timeline['rows'] and all('load' in r and 'bookings' in r for r in timeline['rows']),timeline['rows'][:1]
     print(f"PASS: team capacity timeline returns {len(timeline['weeks'])} weeks for {len(timeline['rows'])} employees")
