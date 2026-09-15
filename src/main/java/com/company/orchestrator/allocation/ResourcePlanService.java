@@ -71,6 +71,26 @@ public class ResourcePlanService {
         var active=db.queryForList("select id,version from resource_plan where project_id=? and status='CONFIRMED' order by version desc limit 1",projectId);
         if(active.isEmpty()) bad("项目没有已确认生效的方案，无需影响分析");
         long planId=((Number)active.getFirst().get("id")).longValue();
+        var conflicts=conflictsOf(projectId,planId);
+        return Map.of("planId",planId,"version",((Number)active.getFirst().get("version")).intValue(),"conflicts",conflicts,"conflictCount",conflicts.size());
+    }
+
+    /** 全局重规划巡检：事件不需要主动上报，任一生效方案与最新数据的冲突都可被检出（Phase 4 事件自动触发的巡检形态）/ scan every active plan for replan-worthy conflicts. */
+    @Transactional(readOnly=true)
+    public List<Map<String,Object>> alerts() {
+        var actives=db.queryForList("select rp.id plan_id, rp.version, p.id project_id, p.name project_name from resource_plan rp join project p on p.id=rp.project_id where rp.status='CONFIRMED' order by p.id");
+        var result=new ArrayList<Map<String,Object>>();
+        for(var a:actives) {
+            var conflicts=conflictsOf(((Number)a.get("project_id")).longValue(),((Number)a.get("plan_id")).longValue());
+            if(!conflicts.isEmpty()) result.add(Map.of("projectId",((Number)a.get("project_id")).longValue(),"projectName",a.get("project_name"),
+                "planId",((Number)a.get("plan_id")).longValue(),"version",((Number)a.get("version")).intValue(),
+                "conflictCount",conflicts.size(),"conflicts",conflicts.stream().limit(3).toList()));
+        }
+        return result;
+    }
+
+    /** 影响分析与巡检共用的五类冲突查询 / the five conflict queries shared by impact() and alerts(). */
+    private List<Map<String,Object>> conflictsOf(long projectId,long planId) {
         var conflicts=new ArrayList<Map<String,Object>>();
         // 与求解器同规则：非 AVAILABLE 窗口即容量清零 / same rule as the solver: non-AVAILABLE windows zero out capacity
         db.queryForList("""
@@ -101,7 +121,7 @@ public class ResourcePlanService {
             from resource_allocation a join task t on t.id=a.task_id join employee e on e.id=a.employee_id, project p
             where p.id=? and a.plan_id=? and a.status='CONFIRMED' and (a.start_date<p.start_date or a.end_date>p.end_date)""",projectId,planId)
             .forEach(r -> conflicts.add(conflict("PROJECT_WINDOW",r,"项目周期已变化，分配 %s→%s 落在窗口之外".formatted(r.get("a_start"),r.get("a_end")))));
-        return Map.of("planId",planId,"version",((Number)active.getFirst().get("version")).intValue(),"conflicts",conflicts,"conflictCount",conflicts.size());
+        return conflicts;
     }
 
     private Map<String,Object> conflict(String type,Map<String,Object> row,String detail) {

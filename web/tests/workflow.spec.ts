@@ -123,13 +123,18 @@ test('leave conflict triggers impact analysis and atomic replan swap',async({pag
   await page.getByRole('combobox').last().selectOption('LEAVE');
   await page.getByRole('dialog').getByRole('button',{name:'保存',exact:true}).click();
   await page.getByRole('button',{name:/项目与编排/}).click();
-  // selected 未清空，切回项目页签即在详情视图 / the project stays selected, so the tab shows its detail view
+  // 巡检横幅：品牌链接回项目列表，冲突项目可见 / patrol banner on the project list via the brand link
+  await page.getByRole('link',{name:/ORCHESTRATOR/}).click();
+  await expect(page.locator('.replan-alerts')).toContainText(name);
+  await page.getByRole('button').filter({has:page.getByRole('heading',{name,exact:true})}).click();
   await page.getByLabel('选择资源方案').selectOption({label:'方案 v1 · CONFIRMED'});
   await page.getByRole('button',{name:'变更影响分析'}).click();
   await expect(page.locator('.impact-list')).toContainText('休假/不可用');
   await page.getByRole('button',{name:'重新求解（重规划）'}).click();
   await expect(page.getByText(/方案 v2 · 待人工确认/)).toBeVisible({timeout:30000});
   await expect(page.getByText('无未分配任务',{exact:true})).toBeVisible();
+  await page.getByRole('button',{name:/重规划差异说明/}).click();
+  await expect(page.locator('.review')).toContainText('重规划');
   await page.getByRole('button',{name:'确认并生效'}).click();
   await expect(page.getByText(/方案 v2 · 已确认生效/)).toBeVisible();
   await expect(page.locator('.plan-banner').first()).not.toContainText('v1 · 已确认生效');

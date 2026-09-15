@@ -480,6 +480,8 @@ MIN
 
 影响分析输出五类具体冲突：`UNAVAILABLE`（休假/不可用窗口重叠，与求解器同规则）、`EMPLOYEE_INACTIVE`、`TASK_DRIFT`（任务日期/状态漂移）、`SKILL_DRIFT`（技能要求或画像变化导致不再达标）、`PROJECT_WINDOW`。项目存在生效分配时普通 `solve` 被拒绝，必须走 `replan`；确认新方案时在同一事务内归档旧分配集，保证任一时刻一个项目只有一套生效分配。
 
+事件触达采用**巡检形态**：`GET /api/v1/replan/alerts` 扫描所有带生效方案的项目并复用同一套冲突检测，前端在项目页签与项目列表提示冲突项目（保存休假后立即刷新）。对重规划草稿，`POST /api/v1/resource-plans/{id}/explain-diff` 基于新旧方案对比 + 影响分析生成差异解释（demo 模式为确定性说明），AI 只解释、不决策。
+
 ### 跨项目负载预警
 
 方案详情会输出**跨项目负载预警**：将本方案条目与其他项目的生效分配按周叠加，任一周合计占用 ≥80% 的人员会被列出（前端展示预警区块，并作为风险上下文进入 AI 解释的输入）。该提示不阻断确认——硬约束已保证不超载，预警用于提示高负荷风险。
@@ -934,8 +936,10 @@ POST /api/v1/ai/project-plan
 ### 重规划 API
 
 ```text
-GET  /api/v1/projects/{id}/replan/impact   # 变更影响分析（五类冲突）
-POST /api/v1/projects/{id}/replan          # 按当前基础数据重求解（生成新草稿）
+GET  /api/v1/projects/{id}/replan/impact      # 变更影响分析（五类冲突）
+POST /api/v1/projects/{id}/replan             # 按当前基础数据重求解（生成新草稿）
+GET  /api/v1/replan/alerts                    # 全局巡检：冲突项目清单
+POST /api/v1/resource-plans/{id}/explain-diff # 重规划草稿的新旧差异解释
 ```
 
 ### 技能识别 API
@@ -1142,7 +1146,7 @@ AI 解释方案
 - **Phase 1 — 基础 MVP**：Employee、Skill、Project、AI Planner、Skill Matching、Timefold Solver、Resource Plan
 - **Phase 2 — 增强项目资源管理**：多项目编排、资源 Timeline、Capacity Heatmap、项目资源冲突、多方案对比、能力 Gap 分析（进行中：技能级缺口分析与周度排期热力图已落地）
 - **Phase 3 — 自动能力画像**：简历解析、项目经历解析、历史任务分析、AI Skill Profile、技能自动更新（核心已落地：文本/文件识别草稿 + 归一化与相似度建议 + 历史证据采纳；向量语义检索留待 pgvector 阶段）
-- **Phase 4 — 动态重规划**：项目延期 / 人员请假 / 需求变化 / 优先级变化 / 新人加入时自动触发重新求解（Event → Impact Analysis → Solver → New Plan → AI 解释 → 人工确认）（进行中：变更影响分析 + 重规划求解 + 原子换班确认已落地；事件自动触发与 AI 差异解释待后续）
+- **Phase 4 — 动态重规划**：项目延期 / 人员请假 / 需求变化 / 优先级变化 / 新人加入时自动触发重新求解（Event → Impact Analysis → Solver → New Plan → AI 解释 → 人工确认）（核心已落地：影响分析 + 重规划求解 + 原子换班 + 全局巡检提醒 + 差异解释；自动触发求解与推送通知留待后续）
 - **Phase 5 — 企业系统集成**：Jira、禅道、GitLab、GitHub、飞书、钉钉、企业微信、HR 系统、ERP、MES
 - **Phase 6 — 组织能力决策**：基于未来项目 Pipeline 做 Skill 供需 Gap 预测，输出招聘 / 培训 / 外包 / 调岗建议，演进为企业能力资源决策平台
 

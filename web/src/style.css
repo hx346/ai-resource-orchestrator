@@ -40,3 +40,9 @@
 .tags.evidence small{margin:0 4px;opacity:.75}
 .impact-list{background:#f6f0e2;color:#7a6335}
 .impact-list small{color:#93805a}
+
+/* ---------- Phase 4: replan patrol alerts / 重规划巡检提醒 ---------- */
+nav button{position:relative}
+.alert-dot{position:absolute;top:6px;right:8px;width:8px;height:8px;border-radius:50%;background:#c25b45;box-shadow:0 0 0 3px rgba(194,91,69,.2)}
+.replan-alerts{background:#f8e3da;color:#a45a45}
+.replan-alerts small{color:#b07560}

@@ -145,13 +145,19 @@ def main():
     a.call(f'/employees/{item["employee_id"]}/availability','POST',{'startDate':item['start_date'],'endDate':item['end_date'],'type':'LEAVE','capacity':0,'remark':'smoke replan'})
     impact=a.call(f'/projects/{pid}/replan/impact')
     assert impact['conflictCount']>=1 and any(c['type']=='UNAVAILABLE' for c in impact['conflicts']),impact
+    patrol=a.call('/replan/alerts')
+    assert any(x['projectId']==pid and x['conflictCount']>=1 for x in patrol),patrol
     replan_id=a.call(f'/projects/{pid}/replan','POST',{'strategy':'LOWEST_RISK'})
     assert a.call(f'/resource-plans/{replan_id}')['status']=='DRAFT'
+    explained=a.call(f'/resource-plans/{replan_id}/explain-diff','POST')
+    assert explained['mode']=='demo' and '重规划' in explained['text'],explained
     a.call(f'/projects/{pid}/solve','POST',{'strategy':'BALANCED'},status=400)
     a.call(f'/resource-plans/{replan_id}/confirm','POST')
     assert a.call(f'/resource-plans/{replan_id}')['status']=='CONFIRMED'
     assert a.call(f'/resource-plans/{fresh}')['status']=='ARCHIVED'
     assert a.call(f'/projects/{pid}/replan/impact')['conflictCount']==0
+    assert not any(x['projectId']==pid for x in a.call('/replan/alerts'))
+    a.call(f'/resource-plans/{fresh}/explain-diff','POST',status=400)
     for row in a.call(f'/employees/{item["employee_id"]}/availability'):
         if row['remark']=='smoke replan': a.call(f'/employees/{item["employee_id"]}/availability/{row["id"]}','DELETE')
     a.call(f'/resource-plans/{replan_id}/cancel','POST')

@@ -484,6 +484,8 @@ Human confirm → atomic swap (old plan archived, allocations replaced)
 
 Impact analysis reports five concrete conflict types: `UNAVAILABLE` (leave/blocked window overlapping an allocation, same rule as the solver), `EMPLOYEE_INACTIVE`, `TASK_DRIFT`, `SKILL_DRIFT`, and `PROJECT_WINDOW`. While active allocations exist, plain `solve` is rejected in favor of `replan`; confirming the new plan archives the old set within the same transaction, so a project always has exactly one active allocation set.
 
+Event reachability takes a **patrol form**: `GET /api/v1/replan/alerts` scans every project with an active plan through the same conflict detection, and the frontend surfaces conflicting projects on the projects tab and list (refreshed right after saving availability). For a replan draft, `POST /api/v1/resource-plans/{id}/explain-diff` produces a diff explanation from the old-vs-new comparison plus impact analysis (deterministic in demo mode) — the AI explains, never decides.
+
 ### Cross-project Load Warnings
 
 Plan details include **cross-project load warnings**: this plan's items plus other projects' active allocations are aggregated per week, and any employee reaching 80% or more in a week is listed (rendered as a warning block, and fed to the AI review input as risk context). The hint never blocks confirmation — hard constraints already prevent overbooking; the warning flags high-load risk.
@@ -941,8 +943,10 @@ Response:
 ### Replanning API
 
 ```text
-GET  /api/v1/projects/{id}/replan/impact   # change impact analysis (five conflict types)
-POST /api/v1/projects/{id}/replan          # re-solve against current data (new draft)
+GET  /api/v1/projects/{id}/replan/impact      # change impact analysis (five conflict types)
+POST /api/v1/projects/{id}/replan             # re-solve against current data (new draft)
+GET  /api/v1/replan/alerts                    # patrol: conflicting projects across the org
+POST /api/v1/resource-plans/{id}/explain-diff # old-vs-new diff explanation for a replan draft
 ```
 
 ### Skill Recognition API
@@ -1149,7 +1153,7 @@ Once this loop runs end to end, the MVP is a success.
 - **Phase 1 — Foundation MVP**: Employee, Skill, Project, AI Planner, Skill Matching, Timefold Solver, Resource Plan
 - **Phase 2 — Richer resource management**: multi-project orchestration, resource timeline, capacity heatmap, cross-project conflicts, plan comparison, capability gap analysis (in progress: skill-level gap analysis and the weekly capacity timeline are shipped)
 - **Phase 3 — Automated skill profiles**: resume parsing, project history parsing, historical task analysis, AI skill profile, automatic skill updates (core shipped: text/file draft extraction + normalization with similarity hints + history-evidence adoption; vector semantic search waits for the pgvector phase)
-- **Phase 4 — Dynamic replanning**: automatically re-solve on delays / leave / requirement changes / priority changes / new hires (Event → Impact Analysis → Solver → New Plan → AI explanation → Human confirmation) (in progress: impact analysis + replan solving + atomic swap confirmation shipped; automatic event triggers and AI diff explanations come later)
+- **Phase 4 — Dynamic replanning**: automatically re-solve on delays / leave / requirement changes / priority changes / new hires (Event → Impact Analysis → Solver → New Plan → AI explanation → Human confirmation) (core shipped: impact analysis + replan solving + atomic swap + org-wide patrol alerts + diff explanations; automatic solving triggers and push notifications come later)
 - **Phase 5 — Enterprise integrations**: Jira, ZenTao, GitLab, GitHub, Feishu, DingTalk, WeCom, HR systems, ERP, MES
 - **Phase 6 — Organizational capability decisions**: skill supply/demand gap forecasting based on the future project pipeline, with hiring / training / outsourcing / transfer suggestions — evolving into an enterprise resource intelligence platform
 

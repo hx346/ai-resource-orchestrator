@@ -29,4 +29,5 @@ public class AiPlanningController {
     }
     @PostMapping("/projects/{id}/ai-plan/accept") public Result<?> accept(@PathVariable long id,@Valid @RequestBody PlanDraft draft) { return Result.ok(service.accept(id,draft)); }
     @PostMapping("/resource-plans/{id}/review") public Result<?> review(@PathVariable long id) { return Result.ok(service.review(id)); }
+    @PostMapping("/resource-plans/{id}/explain-diff") public Result<?> explainDiff(@PathVariable long id) { return Result.ok(service.explainReplan(id)); }
 }
