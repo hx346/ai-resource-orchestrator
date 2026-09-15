@@ -544,6 +544,20 @@ Phase 1 only produces suggestions; nothing is executed automatically.
 
 ---
 
+## Enterprise Integrations & Notifications
+
+First Phase 5 slice: **outbound webhook notifications** (no MQ, no new infrastructure). When a plan is confirmed, or a member's new unavailability overlaps active allocations, the system pushes a message to a group bot **after the transaction commits**; delivery failures are only logged and never break the flow.
+
+```text
+NOTIFY_MODE=off|live          # off by default
+NOTIFY_PROVIDER=generic|feishu|dingtalk|wecom   # payload format
+NOTIFY_WEBHOOK_URL=https://... # group-bot webhook (query tokens masked in logs)
+```
+
+- Events: `PLAN_CONFIRMED`, `AVAILABILITY_CONFLICT` (same rule as the replan patrol)
+- Every attempt is recorded in `notification_log` (type/status/duration/masked target), visible on the settings page
+- Contract test: `scripts/notify_fixture.py` (local webhook stub) + `scripts/check_notify_contract.py`, same pattern as the LLM contract test
+
 ## Architecture
 
 Phase 1 sticks to a **modular monolith** — no microservices.
@@ -1059,6 +1073,9 @@ Key configuration is injected via environment variables (template in [.env.examp
 | `AI_CHAT_PROVIDER` | Spring AI provider, use `openai` in live mode | `none` |
 | `AI_API_KEY` | LLM API key, required in live mode | empty |
 | `AI_MODEL` | Model name | `gpt-4o-mini` |
+| `NOTIFY_MODE` | Outbound notifications `off` / `live` | `off` |
+| `NOTIFY_PROVIDER` | Payload format `generic` / `feishu` / `dingtalk` / `wecom` | `generic` |
+| `NOTIFY_WEBHOOK_URL` | Group-bot webhook URL, required in live mode | empty |
 | `ADMIN_PASSWORD` | First-start admin password (at least 12 characters) | empty (required) |
 | `POSTGRES_HOST` / `POSTGRES_PORT` | Database host / port | `localhost` / `5432` |
 | `POSTGRES_DB` | Database name | `ai_resource_orchestrator` |
@@ -1154,7 +1171,7 @@ Once this loop runs end to end, the MVP is a success.
 - **Phase 2 — Richer resource management**: multi-project orchestration, resource timeline, capacity heatmap, cross-project conflicts, plan comparison, capability gap analysis (in progress: skill-level gap analysis and the weekly capacity timeline are shipped)
 - **Phase 3 — Automated skill profiles**: resume parsing, project history parsing, historical task analysis, AI skill profile, automatic skill updates (core shipped: text/file draft extraction + normalization with similarity hints + history-evidence adoption; vector semantic search waits for the pgvector phase)
 - **Phase 4 — Dynamic replanning**: automatically re-solve on delays / leave / requirement changes / priority changes / new hires (Event → Impact Analysis → Solver → New Plan → AI explanation → Human confirmation) (core shipped: impact analysis + replan solving + atomic swap + org-wide patrol alerts + diff explanations; automatic solving triggers and push notifications come later)
-- **Phase 5 — Enterprise integrations**: Jira, ZenTao, GitLab, GitHub, Feishu, DingTalk, WeCom, HR systems, ERP, MES
+- **Phase 5 — Enterprise integrations**: Jira, ZenTao, GitLab, GitHub, Feishu, DingTalk, WeCom, HR systems, ERP, MES (in progress: Feishu / DingTalk / WeCom / generic outbound webhook notifications shipped; Jira / ZenTao / GitLab project sync comes later)
 - **Phase 6 — Organizational capability decisions**: skill supply/demand gap forecasting based on the future project pipeline, with hiring / training / outsourcing / transfer suggestions — evolving into an enterprise resource intelligence platform
 
 ### Long-term Direction

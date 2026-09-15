@@ -25,6 +25,7 @@ public class EmployeeAvailabilityService {
 
     private final EmployeeAvailabilityMapper availabilityMapper;
     private final EmployeeService employeeService;
+    private final com.company.orchestrator.system.NotifyService notify;
 
     public List<EmployeeAvailability> listByEmployee(Long employeeId) {
         return availabilityMapper.selectList(new LambdaQueryWrapper<EmployeeAvailability>()
@@ -34,10 +35,12 @@ public class EmployeeAvailabilityService {
 
     @Transactional(rollbackFor = Exception.class)
     public Long create(Long employeeId, AvailabilityUpsertRequest request) {
-        employeeService.requireExists(employeeId);
+        var employee = employeeService.requireExists(employeeId);
         if(request.endDate().isBefore(request.startDate())) throw new BusinessException(ErrorCode.BAD_REQUEST,"结束日期早于开始日期");
         EmployeeAvailability availability = request.toEntity(employeeId);
         availabilityMapper.insert(availability);
+        // 与生效分配重叠时在提交后推送冲突提醒（off 模式为空操作）/ conflict notification after commit; no-op when off
+        notify.availabilityImpact(employeeId, employee.getName(), availability.getType().name(), availability.getStartDate(), availability.getEndDate());
         return availability.getId();
     }
 

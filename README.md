@@ -538,6 +538,20 @@ AI 后续可以生成：方案 A 内部调配 / 方案 B 临时外包 / 方案 C
 
 ---
 
+## 企业集成与通知
+
+Phase 5 第一片：**出站 Webhook 通知**（无需引入 MQ / 新基础设施）。方案确认生效、成员新增不可用安排且与生效分配重叠时，系统在**事务提交后**推送一条消息到群机器人；发送失败只记录日志，绝不影响业务流程。
+
+```text
+NOTIFY_MODE=off|live          # off 默认关闭
+NOTIFY_PROVIDER=generic|feishu|dingtalk|wecom   # 报文格式
+NOTIFY_WEBHOOK_URL=https://... # 群机器人 webhook（日志中脱敏 query 令牌）
+```
+
+- 事件：`PLAN_CONFIRMED`（方案确认生效）、`AVAILABILITY_CONFLICT`（不可用安排冲突，与重规划巡检同口径）
+- 记录：所有发送尝试写入 `notification_log`（类型 / 状态 / 耗时 / 脱敏地址），设置页「集成通知」可查看
+- 契约测试：`scripts/notify_fixture.py`（本地 webhook 桩）+ `scripts/check_notify_contract.py`，与 LLM 契约测试同模式
+
 ## 系统架构
 
 第一阶段坚持**模块化单体架构**，不使用微服务。
@@ -1052,6 +1066,9 @@ ai-resource-orchestrator
 | `AI_CHAT_PROVIDER` | Spring AI 提供方，`live` 时使用 `openai` | `none` |
 | `AI_API_KEY` | LLM API Key，`live` 时必填 | 空 |
 | `AI_MODEL` | 模型名称 | `gpt-4o-mini` |
+| `NOTIFY_MODE` | 出站通知开关 `off` / `live` | `off` |
+| `NOTIFY_PROVIDER` | 报文格式 `generic` / `feishu` / `dingtalk` / `wecom` | `generic` |
+| `NOTIFY_WEBHOOK_URL` | 群机器人 webhook 地址，`live` 时必填 | 空 |
 | `ADMIN_PASSWORD` | 首次创建管理员的密码（至少 12 字符） | 空（必填） |
 | `POSTGRES_HOST` / `POSTGRES_PORT` | 数据库地址 | `localhost` / `5432` |
 | `POSTGRES_DB` | 数据库名 | `ai_resource_orchestrator` |
@@ -1147,7 +1164,7 @@ AI 解释方案
 - **Phase 2 — 增强项目资源管理**：多项目编排、资源 Timeline、Capacity Heatmap、项目资源冲突、多方案对比、能力 Gap 分析（进行中：技能级缺口分析与周度排期热力图已落地）
 - **Phase 3 — 自动能力画像**：简历解析、项目经历解析、历史任务分析、AI Skill Profile、技能自动更新（核心已落地：文本/文件识别草稿 + 归一化与相似度建议 + 历史证据采纳；向量语义检索留待 pgvector 阶段）
 - **Phase 4 — 动态重规划**：项目延期 / 人员请假 / 需求变化 / 优先级变化 / 新人加入时自动触发重新求解（Event → Impact Analysis → Solver → New Plan → AI 解释 → 人工确认）（核心已落地：影响分析 + 重规划求解 + 原子换班 + 全局巡检提醒 + 差异解释；自动触发求解与推送通知留待后续）
-- **Phase 5 — 企业系统集成**：Jira、禅道、GitLab、GitHub、飞书、钉钉、企业微信、HR 系统、ERP、MES
+- **Phase 5 — 企业系统集成**：Jira、禅道、GitLab、GitHub、飞书、钉钉、企业微信、HR 系统、ERP、MES（进行中：飞书 / 钉钉 / 企业微信 / 通用 webhook 出站通知已落地；Jira / 禅道 / GitLab 项目同步待后续）
 - **Phase 6 — 组织能力决策**：基于未来项目 Pipeline 做 Skill 供需 Gap 预测，输出招聘 / 培训 / 外包 / 调岗建议，演进为企业能力资源决策平台
 
 ### 长期方向

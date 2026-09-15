@@ -109,6 +109,8 @@ def main():
     assert detailed['gapSummary'][0]['taskCount']==1 and detailed['gapSummary'][0]['totalHours']==8,detailed['gapSummary']
     a.call(f'/resource-plans/{skill_gap_id}/cancel','POST')
     print('PASS: skill-level gap analysis reports missing skills and aggregation')
+    notify=a.call('/system/notify/status')
+    assert notify['mode']=='off' and isinstance(a.call('/system/notify/log'),list),notify
     timeline=a.call('/allocations/timeline')
     assert timeline['weeks'] and timeline['rows'] and all('load' in r and 'bookings' in r for r in timeline['rows']),timeline['rows'][:1]
     print(f"PASS: team capacity timeline returns {len(timeline['weeks'])} weeks for {len(timeline['rows'])} employees")

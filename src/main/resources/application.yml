@@ -70,3 +70,8 @@ logging:
 app:
   admin-password: ${ADMIN_PASSWORD:}
   ai-mode: ${AI_MODE:off}
+  # 出站通知：off 关闭；live 需要 NOTIFY_WEBHOOK_URL / outbound webhook notifications
+  notify:
+    mode: ${NOTIFY_MODE:off}
+    provider: ${NOTIFY_PROVIDER:generic}
+    webhook-url: ${NOTIFY_WEBHOOK_URL:}

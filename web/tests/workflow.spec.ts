@@ -91,6 +91,8 @@ test('gap analysis blocks confirmation and timeline renders weekly load',async({
   await page.locator('input[type=file]').setInputFiles({name:'resume.txt',mimeType:'text/plain',buffer:Buffer.from('精通 Java，参与 Spring Boot 服务开发')});
   await expect(page.getByRole('heading',{name:/技能草稿/})).toBeVisible();
   await expect(page.locator('.draft-skills')).toContainText('Java');
+  await page.getByRole('button',{name:/组织与设置/}).click();
+  await expect(page.getByRole('heading',{name:'集成通知'})).toBeVisible();
   expect(errors).toEqual([]);
 });
 test('leave conflict triggers impact analysis and atomic replan swap',async({page})=>{

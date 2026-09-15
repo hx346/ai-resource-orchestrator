@@ -38,6 +38,8 @@ docker compose up -d              # app + postgres; image builds web into the ja
 ARO_ADMIN_PASSWORD=... python scripts/smoke.py
 # LLM contract test: run scripts/llm_fixture.py (local OpenAI-compatible stub),
 # point AI_BASE_URL at it with AI_MODE=live, then scripts/check_llm_contract.py
+# Notify contract test: run scripts/notify_fixture.py, start the app with
+# NOTIFY_MODE=live NOTIFY_WEBHOOK_URL=http://127.0.0.1:18099/hook, then scripts/check_notify_contract.py
 ```
 
 ## Architecture
@@ -46,7 +48,7 @@ Backend: Java 25, Spring Boot 3.5, MyBatis-Plus + JdbcTemplate, Flyway (PostgreS
 
 ### Modules (`src/main/java/com/company/orchestrator/`)
 
-`auth`, `employee`, `skill`, `project`, `allocation`, `solver`, `ai`, `system`, `common`. CRUD modules follow `controller/dto/entity/mapper/service`; `solver`/`allocation`/`system` are flatter and use raw `JdbcTemplate`.
+`auth`, `employee`, `skill`, `project`, `allocation`, `solver`, `ai`, `system`, `common`. CRUD modules follow `controller/dto/entity/mapper/service`; `solver`/`allocation`/`system` are flatter and use raw `JdbcTemplate`. `system` also hosts `NotifyService`: after-commit outbound webhooks (`PLAN_CONFIRMED`, `AVAILABILITY_CONFLICT`) to Feishu/DingTalk/WeCom/generic endpoints, logged in `notification_log` with masked targets.
 
 - `skill` also hosts `AiSkillProfileService`: AI skill-profile drafts from experience text or uploaded resume files (`ai-extract` / `ai-extract-file`; `demo` = deterministic `DemoSkillExtractor`, `live` = LLM + `SkillNormalizer` + `SkillSimilarity` hints at 0.82+), human-confirmed merges into `employee_skill` (`ai-accept`), and skill evidence with profile-vs-suggested levels (`skills/evidence`, one-click adoption). AI extracts; only humans confirm writes.
 - Cross-module dependency inversion: `skill/api/SkillUsagePort` is implemented by project's `TaskSkillUsageAdapter` to avoid skill ↔ project cycles. Follow this port pattern for new cross-module queries.

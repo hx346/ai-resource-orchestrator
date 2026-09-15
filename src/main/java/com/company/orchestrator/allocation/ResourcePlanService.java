@@ -20,6 +20,7 @@ public class ResourcePlanService {
     private static final int WARN_LOAD=80;
     private final PlanningRepository repository;
     private final CandidateService candidates;
+    private final com.company.orchestrator.system.NotifyService notify;
     private final JdbcTemplate db;
     private final ObjectMapper json;
     @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
@@ -220,6 +221,8 @@ public class ResourcePlanService {
         db.update("update resource_plan set status='ARCHIVED',updated_at=now() where project_id=? and status='CONFIRMED' and id<>?",projectId,id);
         db.update("insert into resource_allocation(project_id,task_id,employee_id,start_date,end_date,allocation,status,plan_id) select project_id,task_id,employee_id,start_date,end_date,allocation,'CONFIRMED',plan_id from resource_plan_item where plan_id=?",id);
         db.update("update resource_plan set status='CONFIRMED',updated_at=now() where id=?",id);
+        // 提交后推送确认通知（off 模式为空操作）/ push after commit; no-op when notify is off
+        notify.planConfirmed(projectId,((Number)plan.get("version")).intValue(),((List<?>)plan.get("items")).size(),plan.get("score_text").toString());
     }
     @Transactional(rollbackFor=Exception.class)
     public void cancel(long id) {
