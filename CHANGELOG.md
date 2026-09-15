@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.6.1] - 2026-09-15
 ### Added
 - Phase 6 remainder: pipeline scenario simulation (`GET /capability/scenario`, window stretches over queued PLANNING projects, per-skill base/scenario/delta gap people), gap trends across 8/12/26-week windows (`GET /capability/trends`), and AI gap advice (`POST /capability/advise`, deterministic demo text, audited `CAPABILITY_ADVISE`). Refactored the forecast core into shared `gapRows`/`demandRows`; frontend capability tab gains a deep-analysis panel.
 
