@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.6.0] - 2026-09-15
 ### Added
 - Phase 6 slice: organizational capability analytics — `GET /capability/supply-demand?weeks=` (skill gaps over an 8/12/26-week window with a conservative demand bar, capacity-discounted supply, 0.8 effective-utilization gap people, and hire/reassign advice), `GET /capability/key-people` (bottleneck-skill holders with competing projects), and `GET /capability/leave-impact` (per-task replaceability what-if). New `capability` module (read-only) and a "Capability" frontend tab.
 ### Fixed
