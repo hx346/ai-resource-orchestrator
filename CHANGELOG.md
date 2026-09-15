@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.5.0] - 2026-09-15
 ### Added
 - Phase 5 slice: outbound webhook notifications — `NotifyService` sends `PLAN_CONFIRMED` and `AVAILABILITY_CONFLICT` events after transaction commit to a Feishu / DingTalk / WeCom / generic group-bot webhook (`NOTIFY_MODE`, `NOTIFY_PROVIDER`, `NOTIFY_WEBHOOK_URL`; failures logged, never thrown). New `notification_log` table (Flyway V3, masked targets), admin endpoints `GET /system/notify/status|log`, a settings-page integration card, a provider-format unit suite, and a local contract test (`scripts/notify_fixture.py` + `scripts/check_notify_contract.py`).
 
