@@ -111,6 +111,15 @@ def main():
     print('PASS: skill-level gap analysis reports missing skills and aggregation')
     notify=a.call('/system/notify/status')
     assert notify['mode']=='off' and isinstance(a.call('/system/notify/log'),list),notify
+    # Phase 6: capability decisions / 组织能力决策
+    sd=a.call('/capability/supply-demand')
+    assert sd['rows'] and all(set(r)>={'skillId','skillName','requiredLevel','demandHours','qualifiedCount','availableHours','gapHours','gapPeople','advice'} for r in sd['rows']),sd
+    rare_rows=[r for r in sd['rows'] if r['skillName'].startswith('Smoke稀有技能')]
+    assert rare_rows and rare_rows[0]['qualifiedCount']==0 and rare_rows[0]['gapHours']>0 and '招聘' in rare_rows[0]['advice'],rare_rows
+    assert isinstance(a.call('/capability/key-people'),list)
+    impact=a.call(f"/capability/leave-impact?employeeId={a.call('/employees')['list'][0]['id']}")
+    assert impact['employeeName'] and isinstance(impact['affectedTasks'],list),impact
+    print(f"PASS: capability forecast ({sd['summary']['shortageSkills']}/{sd['summary']['skillsTracked']} skills short), key people, leave impact")
     timeline=a.call('/allocations/timeline')
     assert timeline['weeks'] and timeline['rows'] and all('load' in r and 'bookings' in r for r in timeline['rows']),timeline['rows'][:1]
     print(f"PASS: team capacity timeline returns {len(timeline['weeks'])} weeks for {len(timeline['rows'])} employees")

@@ -46,3 +46,7 @@ nav button{position:relative}
 .alert-dot{position:absolute;top:6px;right:8px;width:8px;height:8px;border-radius:50%;background:#c25b45;box-shadow:0 0 0 3px rgba(194,91,69,.2)}
 .replan-alerts{background:#f8e3da;color:#a45a45}
 .replan-alerts small{color:#b07560}
+
+/* ---------- Phase 6: capability decisions / 能力决策 ---------- */
+.sd-table tr.short td{background:#f8ede7}
+@media(max-width:760px){nav{grid-template-columns:repeat(3,1fr)}}

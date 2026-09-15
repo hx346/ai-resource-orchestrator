@@ -48,7 +48,7 @@ Backend: Java 25, Spring Boot 3.5, MyBatis-Plus + JdbcTemplate, Flyway (PostgreS
 
 ### Modules (`src/main/java/com/company/orchestrator/`)
 
-`auth`, `employee`, `skill`, `project`, `allocation`, `solver`, `ai`, `system`, `common`. CRUD modules follow `controller/dto/entity/mapper/service`; `solver`/`allocation`/`system` are flatter and use raw `JdbcTemplate`. `system` also hosts `NotifyService`: after-commit outbound webhooks (`PLAN_CONFIRMED`, `AVAILABILITY_CONFLICT`) to Feishu/DingTalk/WeCom/generic endpoints, logged in `notification_log` with masked targets.
+`auth`, `employee`, `skill`, `project`, `allocation`, `solver`, `ai`, `system`, `capability`, `common`. `capability` is read-only analytics (`CapabilityService`: skill supply-demand gaps, bottleneck-skill key people, leave-impact what-if). CRUD modules follow `controller/dto/entity/mapper/service`; `solver`/`allocation`/`system` are flatter and use raw `JdbcTemplate`. `system` also hosts `NotifyService`: after-commit outbound webhooks (`PLAN_CONFIRMED`, `AVAILABILITY_CONFLICT`) to Feishu/DingTalk/WeCom/generic endpoints, logged in `notification_log` with masked targets.
 
 - `skill` also hosts `AiSkillProfileService`: AI skill-profile drafts from experience text or uploaded resume files (`ai-extract` / `ai-extract-file`; `demo` = deterministic `DemoSkillExtractor`, `live` = LLM + `SkillNormalizer` + `SkillSimilarity` hints at 0.82+), human-confirmed merges into `employee_skill` (`ai-accept`), and skill evidence with profile-vs-suggested levels (`skills/evidence`, one-click adoption). AI extracts; only humans confirm writes.
 - Cross-module dependency inversion: `skill/api/SkillUsagePort` is implemented by project's `TaskSkillUsageAdapter` to avoid skill ↔ project cycles. Follow this port pattern for new cross-module queries.
@@ -76,7 +76,7 @@ Same-origin form-login sessions; every non-GET API call needs the CSRF token fro
 
 ### Frontend
 
-Deliberately minimal: `App.vue` is the whole app (tab views: projects/employees/skills/timeline/settings; project detail drives the workflow — task list plus a day-granularity CSS Gantt, the timeline tab renders `GET /api/v1/allocations/timeline` as a weekly capacity heatmap; employee detail includes an AI skill-recognition panel — experience text → draft → human-confirmed profile write), `components/EditDialog.vue` for all forms, `api.ts` for CSRF + fetch + SSE parsing (`streamPlan` handles `progress`/`result`/`error` events). Sends `Accept-Language: zh-CN`.
+Deliberately minimal: `App.vue` is the whole app (tab views: projects/employees/skills/timeline/settings; project detail drives the workflow — task list plus a day-granularity CSS Gantt, the timeline tab renders `GET /api/v1/allocations/timeline` as a weekly capacity heatmap, the capability tab renders supply-demand gaps / key people / leave impact; employee detail includes an AI skill-recognition panel — experience text → draft → human-confirmed profile write), `components/EditDialog.vue` for all forms, `api.ts` for CSRF + fetch + SSE parsing (`streamPlan` handles `progress`/`result`/`error` events). Sends `Accept-Language: zh-CN`.
 
 ## Conventions
 

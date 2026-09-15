@@ -143,5 +143,14 @@ test('leave conflict triggers impact analysis and atomic replan swap',async({pag
   page.once('dialog',d=>d.accept());
   await page.getByRole('button',{name:'撤销方案',exact:true}).click();
   await expect(page.getByText(/方案 v2 · 已撤销/)).toBeVisible();
+  // 自清理：删除为本测试添加的休假，避免占满后续运行的容量 / remove the leave this test created
+  await page.getByRole('button',{name:/团队成员/}).click();
+  await page.getByRole('button',{name:new RegExp(employeeName)}).first().click();
+  page.once('dialog',d=>d.accept());
+  await page.getByRole('button',{name:'删除可用时间'}).click();
+  await expect(page.getByText('暂无特殊安排，使用默认容量。')).toBeVisible();
+  await page.getByRole('button',{name:/能力决策/}).click();
+  await expect(page.getByRole('heading',{name:'看清组织的能力边界。'})).toBeVisible();
+  await expect(page.locator('.sd-table tbody')).toContainText('Java');
   expect(errors).toEqual([]);
 });

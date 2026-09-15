@@ -558,6 +558,28 @@ NOTIFY_WEBHOOK_URL=https://... # group-bot webhook (query tokens masked in logs)
 - Every attempt is recorded in `notification_log` (type/status/duration/masked target), visible on the settings page
 - Contract test: `scripts/notify_fixture.py` (local webhook stub) + `scripts/check_notify_contract.py`, same pattern as the LLM contract test
 
+## Organizational Capability Decisions
+
+First Phase 6 slice (read-only, entirely over internal data): what capabilities are missing, who carries them, and who is irreplaceable.
+
+```text
+GET /api/v1/capability/supply-demand?weeks=12   # skill supply-demand gap forecast (8/12/26 weeks)
+GET /api/v1/capability/key-people               # key capability nodes (bottleneck-skill holders)
+GET /api/v1/capability/leave-impact?employeeId= # what-if impact if a person leaves
+```
+
+**Supply/demand method (conservative)**:
+
+- Demand = skill-required hours of unfinished tasks in the window (allocated ones included — supply is discounted accordingly); the bar is the **highest** min_level demanded per skill
+- Supply = qualified ACTIVE employees' available hours: workdays × 8h × default capacity% − active allocations − unavailability windows
+- Gap people use an **0.8 effective-utilization factor**; advice distinguishes "nobody qualifies (hire/outsource)" from "people exist but lack capacity (reassign/train/hire)"
+
+**Key capability nodes**: holders of bottleneck skills (at most 2 qualified people org-wide), with project counts and allocated hours — which projects compete for the same core people.
+
+**Leave impact (what-if)**: lists the person's active tasks in a 12-week window and checks other qualified people per skill, marking each task replaceable or not.
+
+The frontend "Capability" tab renders all three views; analytics never mutate data — decisions stay human.
+
 ## Architecture
 
 Phase 1 sticks to a **modular monolith** — no microservices.
@@ -1172,7 +1194,7 @@ Once this loop runs end to end, the MVP is a success.
 - **Phase 3 — Automated skill profiles**: resume parsing, project history parsing, historical task analysis, AI skill profile, automatic skill updates (core shipped: text/file draft extraction + normalization with similarity hints + history-evidence adoption; vector semantic search waits for the pgvector phase)
 - **Phase 4 — Dynamic replanning**: automatically re-solve on delays / leave / requirement changes / priority changes / new hires (Event → Impact Analysis → Solver → New Plan → AI explanation → Human confirmation) (core shipped: impact analysis + replan solving + atomic swap + org-wide patrol alerts + diff explanations; automatic solving triggers and push notifications come later)
 - **Phase 5 — Enterprise integrations**: Jira, ZenTao, GitLab, GitHub, Feishu, DingTalk, WeCom, HR systems, ERP, MES (in progress: Feishu / DingTalk / WeCom / generic outbound webhook notifications shipped; Jira / ZenTao / GitLab project sync comes later)
-- **Phase 6 — Organizational capability decisions**: skill supply/demand gap forecasting based on the future project pipeline, with hiring / training / outsourcing / transfer suggestions — evolving into an enterprise resource intelligence platform
+- **Phase 6 — Organizational capability decisions**: skill supply/demand gap forecasting based on the future project pipeline, with hiring / training / outsourcing / transfer suggestions — evolving into an enterprise resource intelligence platform (in progress: supply-demand forecast + key capability nodes + leave-impact what-if shipped; pipeline scenario simulation and AI-generated suggestions come later)
 
 ### Long-term Direction
 
