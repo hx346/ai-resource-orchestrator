@@ -31,6 +31,7 @@ public class ProjectService {
     private final TaskMapper taskMapper;
     private final org.springframework.jdbc.core.JdbcTemplate db;
     private final com.company.orchestrator.allocation.ReplanTriggerService replan;
+    private final com.company.orchestrator.system.NotifyService notify;
     public void lock(Long id) { db.queryForList("select id from project where id=? for update",id); requireExists(id); }
 
 
@@ -67,6 +68,43 @@ public class ProjectService {
         projectMapper.updateById(project);
         // 项目周期变化可能使生效分配落在窗口外 / window changes may push bookings outside the project
         replan.onProjectEvent(id, "PROJECT_UPDATED");
+    }
+
+    private static final java.util.Set<String> STATUSES = java.util.Set.of(
+            Project.STATUS_PLANNING, Project.STATUS_IN_PROGRESS, Project.STATUS_ON_HOLD, Project.STATUS_COMPLETED, Project.STATUS_CANCELLED);
+
+    /** 状态机（纯函数，便于单测）：COMPLETED / CANCELLED 为终态 / pure transition map; COMPLETED and CANCELLED are terminal. */
+    static boolean canTransition(String from, String to) {
+        if (to.equals(from)) return false;
+        return switch (from) {
+            case Project.STATUS_PLANNING -> java.util.Set.of(Project.STATUS_IN_PROGRESS, Project.STATUS_CANCELLED).contains(to);
+            case Project.STATUS_IN_PROGRESS -> java.util.Set.of(Project.STATUS_ON_HOLD, Project.STATUS_COMPLETED, Project.STATUS_CANCELLED).contains(to);
+            case Project.STATUS_ON_HOLD -> java.util.Set.of(Project.STATUS_IN_PROGRESS, Project.STATUS_CANCELLED).contains(to);
+            default -> false;
+        };
+    }
+
+    /**
+     * 项目生命周期流转：进入终态（完结/取消）前须无生效分配；完结还要求全部任务收尾。
+     * 与求解入口的 PLANNING/IN_PROGRESS 白名单互为呼应——终态项目不可再编排。
+     * Terminal transitions require no active bookings; COMPLETED additionally
+     * requires every task closed. Terminal projects can no longer be solved.
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void changeStatus(Long id, String status) {
+        Project project = requireExists(id);
+        if (!STATUSES.contains(status)) throw new BusinessException(ErrorCode.BAD_REQUEST,"不支持的项目状态："+status);
+        if (!canTransition(project.getStatus(), status)) throw new BusinessException(ErrorCode.BAD_REQUEST,"项目状态不允许由 "+project.getStatus()+" 变更为 "+status);
+        if (Project.STATUS_COMPLETED.equals(status) || Project.STATUS_CANCELLED.equals(status)) {
+            if (db.queryForObject("select count(*) from resource_allocation where project_id=? and status in ('PLANNED','CONFIRMED')",Long.class,id)>0)
+                throw new BusinessException(ErrorCode.BAD_REQUEST,"项目仍有生效分配，请先完结任务或撤销方案");
+            if (Project.STATUS_COMPLETED.equals(status) && db.queryForObject("select count(*) from task where project_id=? and status in ('TODO','IN_PROGRESS')",Long.class,id)>0)
+                throw new BusinessException(ErrorCode.BAD_REQUEST,"项目仍有未完结任务，不可标记完结");
+        }
+        // Project 实体 description 等为 ALWAYS 更新策略，定向 SQL 更稳妥 / targeted update avoids wiping ALWAYS columns
+        db.update("update project set status=?,updated_at=now() where id=?", status, id);
+        log.info("project status changed, id={}, {} -> {}", id, project.getStatus(), status);
+        if (Project.STATUS_COMPLETED.equals(status)) notify.projectCompleted(id);
     }
 
     /** 删除项目（级联删除里程碑与任务）/ Delete project with milestones and tasks. */

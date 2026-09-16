@@ -80,6 +80,22 @@ public class NotifyService {
                         "triggerMode", triggerMode, "conflicts", conflicts.stream().limit(5).toList())));
     }
 
+    /** 方案撤销通知：资源占用已释放 / notify that a plan was cancelled and its bookings released. */
+    public void planCancelled(long projectId, int version) {
+        var projectName = db.queryForObject("select name from project where id=?", String.class, projectId);
+        afterCommit(() -> dispatch("PLAN_CANCELLED",
+                "【资源编排】项目「%s」方案 v%d 已撤销，资源占用已释放。".formatted(projectName, version),
+                Map.of("projectId", projectId, "planVersion", version)));
+    }
+
+    /** 项目完结通知（全部任务收尾后）/ notify that a project reached completion. */
+    public void projectCompleted(long projectId) {
+        var projectName = db.queryForObject("select name from project where id=?", String.class, projectId);
+        afterCommit(() -> dispatch("PROJECT_COMPLETED",
+                "【资源编排】项目「%s」已完结，全部任务与分配收尾。".formatted(projectName),
+                Map.of("projectId", projectId)));
+    }
+
     /** 事务内注册提交后发送；无事务时直接发送 / send after commit when inside a transaction. */
     private void afterCommit(Runnable send) {
         if (!"live".equals(mode) || webhookUrl == null || webhookUrl.isBlank()) return;

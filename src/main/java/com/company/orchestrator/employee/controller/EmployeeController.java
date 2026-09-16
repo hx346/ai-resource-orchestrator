@@ -2,6 +2,7 @@ package com.company.orchestrator.employee.controller;
 
 import com.company.orchestrator.common.result.PageVO;
 import com.company.orchestrator.common.result.Result;
+import com.company.orchestrator.employee.dto.EmployeeStatusRequest;
 import com.company.orchestrator.employee.dto.EmployeeUpsertRequest;
 import com.company.orchestrator.employee.dto.EmployeeView;
 import com.company.orchestrator.employee.entity.Employee;
@@ -57,6 +58,13 @@ public class EmployeeController {
     @PutMapping("/{id}")
     public Result<Void> update(@PathVariable Long id, @Valid @RequestBody EmployeeUpsertRequest request) {
         employeeService.update(id, request);
+        return Result.ok();
+    }
+
+    @Operation(summary = "员工状态流转（停用/休假/回归在职）/ Change employee status (offboarding, leave, return)")
+    @PostMapping("/{id}/status")
+    public Result<Void> changeStatus(@PathVariable Long id, @Valid @RequestBody EmployeeStatusRequest request) {
+        employeeService.changeStatus(id, request.status());
         return Result.ok();
     }
 

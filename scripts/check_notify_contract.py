@@ -4,8 +4,9 @@ plus scripts/notify_fixture.py. Python stdlib only.
 
     ARO_ADMIN_PASSWORD=... [ARO_URL=http://127.0.0.1:8080] [FIXTURE_URL=http://127.0.0.1:18099] python scripts/check_notify_contract.py
 
-Verifies PLAN_CONFIRMED and AVAILABILITY_CONFLICT webhooks reach the fixture
-with the generic envelope (event/message/data) after the transaction commits.
+Verifies PLAN_CONFIRMED, AVAILABILITY_CONFLICT, PLAN_CANCELLED and
+PROJECT_COMPLETED webhooks reach the fixture with the generic envelope
+(event/message/data) after the transaction commits.
 """
 import os, json, time, urllib.request, urllib.parse, http.cookiejar, uuid
 
@@ -56,7 +57,22 @@ def main():
     log = call('/system/notify/log')
     assert any(r['type'] == 'PLAN_CONFIRMED' and r['status'] == 'SUCCESS' for r in log), log
     assert any(r['type'] == 'AVAILABILITY_CONFLICT' and r['status'] == 'SUCCESS' for r in log), log
+    # 方案撤销与项目完结事件 / plan cancellation and project completion events
     call(f'/resource-plans/{plan_id}/cancel', 'POST')
+    for t in call(f'/projects/{pid}/tasks'):
+        call(f"/tasks/{t['id']}/status", 'POST', {'status': 'DONE'})
+    call(f'/projects/{pid}/status', 'POST', {'status': 'IN_PROGRESS'})
+    call(f'/projects/{pid}/status', 'POST', {'status': 'COMPLETED'})
+    time.sleep(3)  # after-commit dispatch is asynchronous / 提交后异步发送
+    events = json.loads(urllib.request.urlopen(FIXTURE + '/events', timeout=10).read())
+    bodies = [e['body'] for e in events if isinstance(e.get('body'), dict)]
+    cancelled = [b for b in bodies if b.get('event') == 'PLAN_CANCELLED']
+    completed = [b for b in bodies if b.get('event') == 'PROJECT_COMPLETED']
+    assert cancelled and cancelled[0]['data']['planVersion'] == 1 and 'Notify ' + suffix in cancelled[0]['message'], bodies
+    assert completed and 'Notify ' + suffix in completed[0]['message'], bodies
+    log = call('/system/notify/log')
+    assert any(r['type'] == 'PLAN_CANCELLED' and r['status'] == 'SUCCESS' for r in log), log
+    assert any(r['type'] == 'PROJECT_COMPLETED' and r['status'] == 'SUCCESS' for r in log), log
     print('NOTIFY CONTRACT PASSED; events:', len(bodies))
 
 if __name__ == '__main__':

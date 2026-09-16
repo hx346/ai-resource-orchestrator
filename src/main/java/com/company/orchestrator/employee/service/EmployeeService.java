@@ -31,6 +31,7 @@ public class EmployeeService {
     private final EmployeeMapper employeeMapper;
     private final EmployeeAvailabilityMapper availabilityMapper;
     private final DepartmentService departmentService;
+    private final com.company.orchestrator.allocation.ReplanTriggerService replan;
 
     public IPage<Employee> page(long pageNum, long pageSize, String keyword, Long departmentId) {
         LambdaQueryWrapper<Employee> wrapper = new LambdaQueryWrapper<Employee>()
@@ -76,6 +77,38 @@ public class EmployeeService {
 
         apply(employee, request);
         employeeMapper.updateById(employee);
+    }
+
+    private static final java.util.Set<String> STATUSES = java.util.Set.of(
+            Employee.STATUS_ACTIVE, Employee.STATUS_ON_LEAVE, Employee.STATUS_INACTIVE);
+
+    /** 状态机（纯函数，便于单测）：INACTIVE 仅可回归 ACTIVE / pure transition map; INACTIVE only returns to ACTIVE. */
+    static boolean canTransition(String from, String to) {
+        if (to.equals(from)) return false;
+        return switch (from) {
+            case Employee.STATUS_ACTIVE -> java.util.Set.of(Employee.STATUS_ON_LEAVE, Employee.STATUS_INACTIVE).contains(to);
+            case Employee.STATUS_ON_LEAVE -> java.util.Set.of(Employee.STATUS_ACTIVE, Employee.STATUS_INACTIVE).contains(to);
+            case Employee.STATUS_INACTIVE -> java.util.Set.of(Employee.STATUS_ACTIVE).contains(to);
+            default -> false;
+        };
+    }
+
+    /**
+     * 员工状态流转（离场/休假/回归）：停用或休假即时退出候选（CandidateService 只取 ACTIVE），
+     * 并触发其生效分配所在项目的重规划巡检——EMPLOYEE_INACTIVE/容量冲突由巡检口径检出。
+     * Offboarding and leave: non-ACTIVE employees drop out of candidacy at once,
+     * and an event-driven patrol re-checks the plans that booked them.
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void changeStatus(Long id, String status) {
+        Employee employee = requireExists(id);
+        if (!STATUSES.contains(status)) throw new BusinessException(ErrorCode.BAD_REQUEST,"不支持的员工状态："+status);
+        if (!canTransition(employee.getStatus(), status)) throw new BusinessException(ErrorCode.BAD_REQUEST,"员工状态不允许由 "+employee.getStatus()+" 变更为 "+status);
+        String from = employee.getStatus();
+        employee.setStatus(status);
+        employeeMapper.updateById(employee);
+        if (!Employee.STATUS_ACTIVE.equals(status)) replan.onEmployeeEvent(id, "EMPLOYEE_STATUS_CHANGED");
+        log.info("employee status changed, id={}, {} -> {}", id, from, status);
     }
 
     @Transactional(rollbackFor = Exception.class)

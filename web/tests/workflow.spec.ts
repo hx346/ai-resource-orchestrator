@@ -9,10 +9,15 @@ test('project → editable AI draft → solver → review → confirmation',asyn
   await page.screenshot({path:'../.temp/workspace.png',fullPage:true});
   await page.getByRole('button',{name:/团队成员/}).click();
   await expect(page.getByRole('heading',{name:'每一种能力，都被看见。'})).toBeVisible();
+  await page.getByRole('button',{name:'载入 10 位演示员工'}).waitFor({state:'visible',timeout:10000}).catch(()=>{});  // 演示数据未载入时按钮可能晚渲染 / the loader button may render late on a cold backend
   if(await page.getByRole('button',{name:'载入 10 位演示员工'}).isVisible())await page.getByRole('button',{name:'载入 10 位演示员工'}).click();
-  await expect(page.getByRole('button',{name:/陈知远/})).toBeVisible();
+  await expect(page.getByRole('button',{name:/陈知远/})).toBeVisible({timeout:30000});
   await page.getByRole('button',{name:/陈知远/}).click();
   await expect(page.getByRole('heading',{name:'陈知远 · 能力画像'})).toBeVisible();
+  await page.getByLabel('成员状态').selectOption('ON_LEAVE');
+  await expect(page.getByLabel('成员状态')).toHaveValue('ON_LEAVE');
+  await page.getByLabel('成员状态').selectOption('ACTIVE');
+  await expect(page.getByLabel('成员状态')).toHaveValue('ACTIVE');
   await page.getByRole('button',{name:/项目与编排/}).click();
   await page.getByRole('button',{name:'新建项目',exact:true}).click();
   const name='浏览器闭环 '+Date.now();
@@ -50,6 +55,13 @@ test('project → editable AI draft → solver → review → confirmation',asyn
   page.once('dialog',d=>d.accept());
   await page.getByRole('button',{name:'撤销方案',exact:true}).click();
   await expect(page.getByText(/方案 v1 · 已撤销/)).toBeVisible();
+  // 执行收尾：任务开始/完成，项目进入执行 / execution lifecycle: task start & done, project in progress
+  await page.getByRole('button',{name:'开始',exact:true}).first().click();
+  await expect(page.locator('tr',{hasText:'确认需求范围'}).locator('.badge')).toContainText('进行中');
+  await page.getByRole('button',{name:'完成',exact:true}).first().click();
+  await expect(page.locator('tr',{hasText:'确认需求范围'}).locator('.badge')).toContainText('已完成');
+  await page.getByLabel('项目状态').selectOption('IN_PROGRESS');
+  await expect(page.getByLabel('项目状态')).toHaveValue('IN_PROGRESS');
   expect(errors).toEqual([]);
 });
 test('gap analysis blocks confirmation and timeline renders weekly load',async({page})=>{

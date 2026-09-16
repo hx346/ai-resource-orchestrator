@@ -9,6 +9,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.company.orchestrator.common.exception.BusinessException;
 import com.company.orchestrator.common.exception.ErrorCode;
 import com.company.orchestrator.project.dto.TaskUpsertRequest;
+import com.company.orchestrator.project.entity.Project;
 import com.company.orchestrator.project.entity.Task;
 import com.company.orchestrator.project.entity.TaskDependency;
 import com.company.orchestrator.project.entity.TaskSkillRequirement;
@@ -67,6 +68,44 @@ public class TaskService {
         Task task = requireExists(id);
         apply(task, task.getProjectId(), request);
         taskMapper.updateById(task);
+    }
+
+    private static final java.util.Set<String> STATUSES = java.util.Set.of(
+            Task.STATUS_TODO, Task.STATUS_IN_PROGRESS, Task.STATUS_DONE, Task.STATUS_CANCELLED);
+
+    /** 状态机（纯函数，便于单测）：DONE / CANCELLED 为终态 / pure transition map; DONE and CANCELLED are terminal. */
+    static boolean canTransition(String from, String to) {
+        if (to.equals(from)) return false;
+        return switch (from) {
+            case Task.STATUS_TODO -> java.util.Set.of(Task.STATUS_IN_PROGRESS, Task.STATUS_DONE, Task.STATUS_CANCELLED).contains(to);
+            case Task.STATUS_IN_PROGRESS -> java.util.Set.of(Task.STATUS_TODO, Task.STATUS_DONE, Task.STATUS_CANCELLED).contains(to);
+            default -> false;
+        };
+    }
+
+    /**
+     * 执行侧状态流转（Phase 1–7 收尾段）：完结/取消任务时同步收尾其生效分配——
+     * DONE→分配 COMPLETED、CANCELLED→分配 CANCELLED，容量即时释放（下游均按 PLANNED/CONFIRMED 过滤）。
+     * Execution-side transition; completing or cancelling a task also closes its
+     * active bookings so capacity is released immediately.
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void changeStatus(Long id, String status) {
+        Task task = requireExists(id);
+        if (!STATUSES.contains(status)) throw new BusinessException(ErrorCode.BAD_REQUEST,"不支持的任务状态："+status);
+        if (!canTransition(task.getStatus(), status)) throw new BusinessException(ErrorCode.BAD_REQUEST,"任务状态不允许由 "+task.getStatus()+" 变更为 "+status);
+        var project = projectService.requireExists(task.getProjectId());
+        if (Project.STATUS_COMPLETED.equals(project.getStatus()) || Project.STATUS_CANCELLED.equals(project.getStatus()))
+            throw new BusinessException(ErrorCode.BAD_REQUEST,"项目已完结/取消，不可变更任务状态");
+        if (Task.STATUS_DONE.equals(status) || Task.STATUS_CANCELLED.equals(status)) {
+            if (db.queryForObject("select count(*) from task where parent_id=? and status in ('TODO','IN_PROGRESS')",Long.class,id)>0)
+                throw new BusinessException(ErrorCode.BAD_REQUEST,"存在未完结的子任务，请先完结子任务");
+            db.update("update resource_allocation set status=?,updated_at=now() where task_id=? and status in ('PLANNED','CONFIRMED')",
+                    Task.STATUS_DONE.equals(status) ? "COMPLETED" : "CANCELLED", id);
+        }
+        // Task 实体多个字段为 ALWAYS 更新策略，部分实体更新会误置空，故用定向 SQL / targeted update, partial entities would null ALWAYS columns
+        db.update("update task set status=?,updated_at=now() where id=?", status, id);
+        log.info("task status changed, id={}, {} -> {}", id, task.getStatus(), status);
     }
 
     /** 删除任务（连同其依赖与技能需求）/ Delete task with dependencies and skill requirements. */

@@ -212,5 +212,34 @@ def main():
     print('PASS: leave triggers impact analysis, replan swaps the active allocation set atomically')
     a.call(f'/resource-plans/{fresh}/cancel','POST')
     print('PASS: concurrent duplicate confirmation is safe')
+    # 执行侧生命周期：任务完结收尾分配，项目/员工状态流转 / execution lifecycle closes the loop
+    life=a.call('/projects','POST',{**project,'name':'Life '+suffix})
+    life_task=a.call(f'/projects/{life}/tasks','POST',{'name':'Lifecycle deliverable','startDate':'2026-10-05','endDate':'2026-10-16','estimatedHours':24})
+    life_plan=a.call(f'/projects/{life}/solve','POST',{'strategy':'BALANCED'})
+    a.call(f'/resource-plans/{life_plan}/confirm','POST')
+    def timeline_has(name):return name in json.dumps(a.call('/allocations/timeline'))
+    assert timeline_has('Lifecycle deliverable')
+    a.call(f'/tasks/{life_task}/status','POST',{'status':'BOGUS'},status=400)
+    a.call(f'/tasks/{life_task}/status','POST',{'status':'DONE'})
+    assert not timeline_has('Lifecycle deliverable')  # DONE 即时收尾分配、释放占用 / completing closes the booking at once
+    a.call(f'/tasks/{life_task}/status','POST',{'status':'TODO'},status=400)  # 终态不可回退 / terminal
+    a.call(f'/projects/{life}/status','POST',{'status':'COMPLETED'},status=400)  # PLANNING 不可直接完结
+    a.call(f'/projects/{life}/status','POST',{'status':'IN_PROGRESS'})
+    a.call(f'/projects/{life}/status','POST',{'status':'COMPLETED'})
+    a.call(f'/projects/{life}/solve','POST',{'strategy':'BALANCED'},status=400)  # 终态项目不可编排
+    assert a.call(f'/projects/{life}')['status']=='COMPLETED'
+    a.call(f'/tasks/{ids[0]}/status','POST',{'status':'CANCELLED'})
+    a.call(f'/tasks/{ids[1]}/status','POST',{'status':'IN_PROGRESS'})
+    a.call(f'/tasks/{ids[1]}/status','POST',{'status':'DONE'})
+    a.call(f'/tasks/{ids[2]}/status','POST',{'status':'DONE'})
+    a.call(f'/projects/{pid}/status','POST',{'status':'IN_PROGRESS'})
+    a.call(f'/projects/{pid}/status','POST',{'status':'COMPLETED'})
+    assert a.call(f'/projects/{pid}')['status']=='COMPLETED'
+    emp0=a.call('/employees')['list'][0]
+    a.call(f'/employees/{emp0["id"]}/status','POST',{'status':'INACTIVE'})
+    a.call(f'/employees/{emp0["id"]}/status','POST',{'status':'ON_LEAVE'},status=400)  # INACTIVE 仅可回归 ACTIVE
+    assert [e for e in a.call('/employees')['list'] if e['id']==emp0['id']][0]['status']=='INACTIVE'
+    a.call(f'/employees/{emp0["id"]}/status','POST',{'status':'ACTIVE'})
+    print('PASS: execution lifecycle — task DONE closes bookings, project reaches COMPLETED, employee offboarding guarded')
     print('ALL API SMOKE CHECKS PASSED; record suffix:',suffix)
 if __name__=='__main__':main()

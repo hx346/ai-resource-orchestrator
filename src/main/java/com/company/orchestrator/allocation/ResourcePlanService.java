@@ -231,6 +231,8 @@ public class ResourcePlanService {
         if("ARCHIVED".equals(plan.get("status"))) return;
         db.update("update resource_allocation set status='CANCELLED',updated_at=now() where plan_id=?",id);
         db.update("update resource_plan set status='ARCHIVED',updated_at=now() where id=?",id);
+        // 提交后推送撤销通知（off 模式为空操作）/ push after commit; no-op when notify is off
+        notify.planCancelled(((Number)plan.get("project_id")).longValue(),((Number)plan.get("version")).intValue());
     }
     private void saveItems(long id,long projectId,List<ResourceAssignment> assignments,Input input) {
         var gaps=new ArrayList<Map<String,Object>>();

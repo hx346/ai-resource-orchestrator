@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.company.orchestrator.common.result.Result;
+import com.company.orchestrator.project.dto.TaskStatusRequest;
 import com.company.orchestrator.project.dto.TaskUpsertRequest;
 import com.company.orchestrator.project.dto.TaskView;
 import com.company.orchestrator.project.service.TaskService;
@@ -46,6 +47,13 @@ public class TaskController {
     @PutMapping("/api/v1/tasks/{taskId}")
     public Result<Void> update(@PathVariable Long taskId, @Valid @RequestBody TaskUpsertRequest request) {
         taskService.update(taskId, request);
+        return Result.ok();
+    }
+
+    @Operation(summary = "任务状态流转（完结时收尾分配）/ Change task status; completing or cancelling closes its bookings")
+    @PostMapping("/api/v1/tasks/{taskId}/status")
+    public Result<Void> changeStatus(@PathVariable Long taskId, @Valid @RequestBody TaskStatusRequest request) {
+        taskService.changeStatus(taskId, request.status());
         return Result.ok();
     }
 

@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.company.orchestrator.common.result.PageVO;
 import com.company.orchestrator.common.result.Result;
+import com.company.orchestrator.project.dto.ProjectStatusRequest;
 import com.company.orchestrator.project.dto.ProjectUpsertRequest;
 import com.company.orchestrator.project.dto.ProjectView;
 import com.company.orchestrator.project.service.ProjectService;
@@ -56,6 +57,13 @@ public class ProjectController {
     @PutMapping("/{id}")
     public Result<Void> update(@PathVariable Long id, @Valid @RequestBody ProjectUpsertRequest request) {
         projectService.update(id, request);
+        return Result.ok();
+    }
+
+    @Operation(summary = "项目状态流转（PLANNING→IN_PROGRESS→COMPLETED 等）/ Change project status through its lifecycle")
+    @PostMapping("/{id}/status")
+    public Result<Void> changeStatus(@PathVariable Long id, @Valid @RequestBody ProjectStatusRequest request) {
+        projectService.changeStatus(id, request.status());
         return Result.ok();
     }
 
