@@ -128,6 +128,35 @@ def main():
     advise=a.call('/capability/advise?weeks=12','POST')
     assert advise['mode']=='demo' and advise['text'],advise
     print(f"PASS: capability forecast ({sd['summary']['shortageSkills']}/{sd['summary']['skillsTracked']} skills short), key people, leave impact, scenario, trends, advice")
+    # Phase 6 remainder: weekly supply model + external market benchmarks / 周级供给模型与市场数据
+    weekly=a.call('/capability/supply-weekly?weeks=8')
+    assert weekly['weekStarts'] and len(weekly['weekStarts'])==8,weekly
+    assert all(set(r)>={'skillId','skillName','weekly','demandHours','gapHours','gapPeople'} for r in weekly['rows']),weekly['rows'][:1]
+    sd_weekly=a.call('/capability/supply-demand?weeks=8&model=weekly')
+    assert sd_weekly['model']=='weekly',sd_weekly
+    a.call('/capability/supply-demand?weeks=8&model=bogus',status=400)
+    market_skill=sd['rows'][0]['skillId']
+    imported=a.call('/capability/market/import','POST',{'source':'smoke','items':[{'skillId':market_skill,'demandIndex':85,'salaryMin':15000,'salaryMax':30000,'hiringLeadWeeks':6,'note':'smoke'}]})
+    assert imported['imported']==1,imported
+    market=a.call('/capability/market')
+    assert any(m['skillId']==market_skill and float(m['demandIndex'])==85 for m in market),market
+    enriched=a.call('/capability/supply-demand?weeks=12')
+    target=[r for r in enriched['rows'] if r['skillId']==market_skill]
+    assert target and 'market' in target[0],target
+    advise_market=a.call('/capability/advise?weeks=12','POST')
+    if any(r['skillId']==market_skill and r['gapPeople']>0 for r in enriched['rows']):
+        assert '市场参考' in advise_market['text'],advise_market['text'][-200:]
+    a.call(f'/capability/market/{market_skill}','DELETE')
+    assert not any(m['skillId']==market_skill for m in a.call('/capability/market'))
+    a.call(f'/capability/market/{market_skill}','DELETE',status=400)
+    print('PASS: weekly supply model, flat/weekly model switch, market import enriching forecast and advice')
+    # Phase 3/4/5 remainders: semantic (disabled by default), auto-replan trigger log, sync guards / 余项守卫
+    a.call('/skills/semantic?q=java',status=400)
+    a.call('/skills/semantic/rebuild','POST',status=400)
+    assert isinstance(a.call('/replan/triggers'),list)
+    a.call('/sync/jira/projects',status=400)
+    a.call('/sync/bogus/projects',status=400)
+    print('PASS: optional capabilities stay guarded when disabled (semantic search, external sync)')
     timeline=a.call('/allocations/timeline')
     assert timeline['weeks'] and timeline['rows'] and all('load' in r and 'bookings' in r for r in timeline['rows']),timeline['rows'][:1]
     print(f"PASS: team capacity timeline returns {len(timeline['weeks'])} weeks for {len(timeline['rows'])} employees")
