@@ -36,6 +36,7 @@ def main():
     assert call('/system/notify/status')['mode'] == 'live', 'start the backend with NOTIFY_MODE=live'
 
     suffix = uuid.uuid4().hex[:8]
+    if call('/employees')['total'] == 0: call('/system/demo-data', 'POST')  # solve needs staffed employees
     pid = call('/projects', 'POST', {'name': 'Notify ' + suffix, 'description': '契约测试', 'startDate': '2026-10-05', 'endDate': '2026-10-30', 'priority': 3})
     draft = call(f'/projects/{pid}/ai-plan', 'POST')
     call(f'/projects/{pid}/ai-plan/accept', 'POST', draft)
