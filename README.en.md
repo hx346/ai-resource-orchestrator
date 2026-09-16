@@ -486,6 +486,16 @@ Impact analysis reports five concrete conflict types: `UNAVAILABLE` (leave/block
 
 Event reachability takes a **patrol form**: `GET /api/v1/replan/alerts` scans every project with an active plan through the same conflict detection, and the frontend surfaces conflicting projects on the projects tab and list (refreshed right after saving availability). For a replan draft, `POST /api/v1/resource-plans/{id}/explain-diff` produces a diff explanation from the old-vs-new comparison plus impact analysis (deterministic in demo mode) — the AI explains, never decides.
 
+### Execution-side Lifecycle
+
+Three status-transition endpoints close the execution segment after allocations take effect (humans stay the operator):
+
+- `POST /api/v1/tasks/{id}/status`: task `TODO → IN_PROGRESS → DONE / CANCELLED` (`DONE` / `CANCELLED` terminal; a TODO may complete directly). **Completing or cancelling a task also closes its active bookings** (allocation status becomes `COMPLETED` / `CANCELLED`), releasing capacity at once across solving, timeline, capability forecasts and cross-project warnings; a parent task cannot close while children remain open.
+- `POST /api/v1/projects/{id}/status`: project `PLANNING → IN_PROGRESS → ON_HOLD / COMPLETED / CANCELLED` (terminal states are final). Terminal transitions require no active bookings (finish tasks or cancel the plan first); `COMPLETED` additionally requires every task closed. Terminal projects can no longer be solved.
+- `POST /api/v1/employees/{id}/status`: employee `ACTIVE ⇄ ON_LEAVE`, `ACTIVE → INACTIVE`, `INACTIVE → ACTIVE`. Deactivation or leave drops the employee from candidacy at once (the solver takes ACTIVE only) and triggers the replan patrol on projects that booked them (`EMPLOYEE_INACTIVE` and other conflicts detected through the patrol) — offboarding finally has a clean path (deletion stays FK-protected while allocations exist; deactivate first).
+
+The task list gains a status column with start / complete / cancel actions; project detail and employee profile gain status pickers. Plan cancellation and project completion push `PLAN_CANCELLED` and `PROJECT_COMPLETED` webhooks.
+
 ### Cross-project Load Warnings
 
 Plan details include **cross-project load warnings**: this plan's items plus other projects' active allocations are aggregated per week, and any employee reaching 80% or more in a week is listed (rendered as a warning block, and fed to the AI review input as risk context). The hint never blocks confirmation — hard constraints already prevent overbooking; the warning flags high-load risk.
@@ -554,7 +564,7 @@ NOTIFY_PROVIDER=generic|feishu|dingtalk|wecom   # payload format
 NOTIFY_WEBHOOK_URL=https://... # group-bot webhook (query tokens masked in logs)
 ```
 
-- Events: `PLAN_CONFIRMED`, `AVAILABILITY_CONFLICT` (same rule as the replan patrol), `REPLAN_SUGGESTED` (event-driven replan notice)
+- Events: `PLAN_CONFIRMED`, `AVAILABILITY_CONFLICT` (same rule as the replan patrol), `REPLAN_SUGGESTED` (event-driven replan notice), `PLAN_CANCELLED` (plan cancelled, bookings released), `PROJECT_COMPLETED` (project completed)
 - Auto replanning (Phase 4 remainder): `REPLAN_AUTO_TRIGGER=off|detect|auto`. Leave windows, skill-profile writes, skill-library edits and project-window changes enqueue an after-commit asynchronous patrol of the affected active plans: `detect` pushes a notice; `auto` additionally drafts a replacement plan (human confirmation still required). A cooldown (`REPLAN_COOLDOWN_MINUTES`, default 30) suppresses repeats; every decision lands in `replan_trigger_log` (`GET /api/v1/replan/triggers`, shown on the settings page)
 - Every attempt is recorded in `notification_log` (type/status/duration/masked target), visible on the settings page
 - Contract test: `scripts/notify_fixture.py` (local webhook stub) + `scripts/check_notify_contract.py`, same pattern as the LLM contract test
@@ -1030,6 +1040,14 @@ GET  /api/v1/projects/{id}/replan/impact      # change impact analysis (five con
 POST /api/v1/projects/{id}/replan             # re-solve against current data (new draft)
 GET  /api/v1/replan/alerts                    # patrol: conflicting projects across the org
 POST /api/v1/resource-plans/{id}/explain-diff # old-vs-new diff explanation for a replan draft
+```
+
+### Lifecycle API
+
+```text
+POST /api/v1/tasks/{id}/status       # task transition (closing a task closes its bookings)
+POST /api/v1/projects/{id}/status    # project lifecycle (terminal states need no active bookings)
+POST /api/v1/employees/{id}/status   # employee offboarding / leave / return (triggers the patrol)
 ```
 
 ### Skill Recognition API

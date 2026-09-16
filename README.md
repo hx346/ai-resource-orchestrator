@@ -482,6 +482,16 @@ MIN
 
 事件触达采用**巡检形态**：`GET /api/v1/replan/alerts` 扫描所有带生效方案的项目并复用同一套冲突检测，前端在项目页签与项目列表提示冲突项目（保存休假后立即刷新）。对重规划草稿，`POST /api/v1/resource-plans/{id}/explain-diff` 基于新旧方案对比 + 影响分析生成差异解释（demo 模式为确定性说明），AI 只解释、不决策。
 
+### 执行侧生命周期（执行收尾）
+
+分配生效后的执行段通过三个状态流转接口闭环（人始终是操作方）：
+
+- `POST /api/v1/tasks/{id}/status`：任务 `TODO → IN_PROGRESS → DONE / CANCELLED`（`DONE` / `CANCELLED` 为终态，允许 TODO 直接完成）。**完结或取消任务时同步收尾其生效分配**（分配状态置为 `COMPLETED` / `CANCELLED`），容量在求解、排期、能力预测、跨项目预警等所有口径下即时释放；存在未完结子任务时父任务不可收尾。
+- `POST /api/v1/projects/{id}/status`：项目 `PLANNING → IN_PROGRESS → ON_HOLD / COMPLETED / CANCELLED`（终态不可回退）。进入终态要求无生效分配（先完结任务或撤销方案）；`COMPLETED` 还要求全部任务收尾。终态项目不可再求解。
+- `POST /api/v1/employees/{id}/status`：员工 `ACTIVE ⇄ ON_LEAVE`、`ACTIVE → INACTIVE`、`INACTIVE → ACTIVE`。停用 / 休假即时退出候选（求解只取 ACTIVE），并触发其生效分配所在项目的重规划巡检（`EMPLOYEE_INACTIVE` 等冲突按巡检口径检出与推送）——员工离场有了干净路径（有分配时删除仍受外键保护，先停用再处理分配）。
+
+任务列表新增状态列与「开始 / 完成 / 取消」操作；项目详情与员工画像提供状态流转下拉。撤销方案与项目完结分别推送 `PLAN_CANCELLED`、`PROJECT_COMPLETED` webhook 事件。
+
 ### 跨项目负载预警
 
 方案详情会输出**跨项目负载预警**：将本方案条目与其他项目的生效分配按周叠加，任一周合计占用 ≥80% 的人员会被列出（前端展示预警区块，并作为风险上下文进入 AI 解释的输入）。该提示不阻断确认——硬约束已保证不超载，预警用于提示高负荷风险。
@@ -548,7 +558,7 @@ NOTIFY_PROVIDER=generic|feishu|dingtalk|wecom   # 报文格式
 NOTIFY_WEBHOOK_URL=https://... # 群机器人 webhook（日志中脱敏 query 令牌）
 ```
 
-- 事件：`PLAN_CONFIRMED`（方案确认生效）、`AVAILABILITY_CONFLICT`（不可用安排冲突，与重规划巡检同口径）、`REPLAN_SUGGESTED`（事件自动触发的重规划提醒）
+- 事件：`PLAN_CONFIRMED`（方案确认生效）、`AVAILABILITY_CONFLICT`（不可用安排冲突，与重规划巡检同口径）、`REPLAN_SUGGESTED`（事件自动触发的重规划提醒）、`PLAN_CANCELLED`（方案撤销，资源占用已释放）、`PROJECT_COMPLETED`（项目完结）
 - 自动重规划（Phase 4 余项）：`REPLAN_AUTO_TRIGGER=off|detect|auto`。休假 / 技能画像 / 技能库 / 项目周期变化在事务提交后异步巡检受影响的生效方案：`detect` 推送提醒；`auto` 额外自动生成重规划草稿（仍须人工确认才换班）。冷却窗口 `REPLAN_COOLDOWN_MINUTES`（默认 30）抑制重复触发，全部动作记录在 `replan_trigger_log`（`GET /api/v1/replan/triggers`，设置页可查看）
 - 记录：所有发送尝试写入 `notification_log`（类型 / 状态 / 耗时 / 脱敏地址），设置页「集成通知」可查看
 - 契约测试：`scripts/notify_fixture.py`（本地 webhook 桩）+ `scripts/check_notify_contract.py`，与 LLM 契约测试同模式
@@ -1023,6 +1033,14 @@ GET  /api/v1/projects/{id}/replan/impact      # 变更影响分析（五类冲�
 POST /api/v1/projects/{id}/replan             # 按当前基础数据重求解（生成新草稿）
 GET  /api/v1/replan/alerts                    # 全局巡检：冲突项目清单
 POST /api/v1/resource-plans/{id}/explain-diff # 重规划草稿的新旧差异解释
+```
+
+### 生命周期 API
+
+```text
+POST /api/v1/tasks/{id}/status       # 任务状态流转（完结即收尾分配，容量即时释放）
+POST /api/v1/projects/{id}/status    # 项目生命周期流转（终态须无生效分配）
+POST /api/v1/employees/{id}/status   # 员工停用 / 休假 / 回归（触发重规划巡检）
 ```
 
 ### 技能识别 API
