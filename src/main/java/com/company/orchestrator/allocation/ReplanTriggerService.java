@@ -107,7 +107,10 @@ public class ReplanTriggerService {
         String result = "NOTIFIED";
         String detail = null;
         if ("auto".equals(mode)) {
-            try { draftPlanId = plans.replan(projectId, "BALANCED", "auto-replan"); result = "DRAFTED"; }
+            // 沿用当前生效方案的求解策略，而非固定 BALANCED / keep the active plan's strategy
+            var strategyRows = db.queryForList("select strategy from resource_plan where id=?", String.class, planId);
+            var strategy = strategyRows.isEmpty() ? null : strategyRows.getFirst();
+            try { draftPlanId = plans.replan(projectId, strategy == null ? "BALANCED" : strategy, "auto-replan"); result = "DRAFTED"; }
             catch (RuntimeException ex) { result = "FAILED"; detail = ex.getMessage(); log.warn("auto replan solve failed, projectId={}", projectId, ex); }
         }
         record(event, employeeId, projectId, planId, conflicts.size(), result, detail);

@@ -1,5 +1,6 @@
 package com.company.orchestrator.skill.service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
@@ -62,17 +63,15 @@ public class SkillSemanticService {
                 "model", modelLabel(), "dim", dim, "embeddedSkills", count == null ? 0 : count);
     }
 
-    /** 重建全部技能向量（切换嵌入模式后执行）/ rebuild all skill vectors. */
+    /** 重建全部技能向量（切换嵌入模式后执行；live 模式批量调用）/ rebuild all skill vectors, batched in live mode. */
     @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> rebuild() {
         requireEnabled();
-        int written = 0;
-        for (var skill : skills.selectList(new LambdaQueryWrapper<Skill>().eq(Skill::getStatus, Skill.STATUS_ACTIVE))) {
-            store(skill.getId(), skill.getName());
-            written++;
-        }
-        log.info("skill embeddings rebuilt, size={}, mode={}", written, modelLabel());
-        return Map.of("rebuilt", written, "model", modelLabel());
+        var active = skills.selectList(new LambdaQueryWrapper<Skill>().eq(Skill::getStatus, Skill.STATUS_ACTIVE));
+        var vectors = embedAll(active.stream().map(Skill::getName).toList());
+        for (int i = 0; i < active.size(); i++) store(active.get(i).getId(), vectors.get(i));
+        log.info("skill embeddings rebuilt, size={}, mode={}", active.size(), modelLabel());
+        return Map.of("rebuilt", active.size(), "model", modelLabel());
     }
 
     /** 语义检索：返回带余弦得分的近邻 / top semantic neighbours with cosine scores. */
@@ -100,13 +99,21 @@ public class SkillSemanticService {
 
     public record Suggestion(long skillId, String skillName, double score) {}
 
-    private void store(long skillId, String name) {
-        float[] vector = embed(name);
+    private void store(long skillId, float[] vector) {
         db.update("""
                 insert into skill_embedding(skill_id, model, dim, embedding, updated_at) values (?,?,?,cast(? as vector),now())
                 on conflict (skill_id) do update set model=excluded.model, dim=excluded.dim,
                     embedding=excluded.embedding, updated_at=now()""",
                 skillId, modelLabel(), vector.length, SemanticEmbedding.literal(vector));
+    }
+
+    /** 批量嵌入：local 逐个哈希；live 按 LIVE_BATCH 分批调用 / batch embedding, chunked in live mode. */
+    List<float[]> embedAll(List<String> texts) {
+        if (!"live".equals(mode)) return texts.stream().map(t -> SemanticEmbedding.hash(t, dim)).toList();
+        var result = new ArrayList<float[]>(texts.size());
+        for (int from = 0; from < texts.size(); from += LIVE_BATCH)
+            result.addAll(embed(texts.subList(from, Math.min(texts.size(), from + LIVE_BATCH))));
+        return result;
     }
 
     private float[] embed(String text) {
@@ -116,6 +123,22 @@ public class SkillSemanticService {
         var executor = Executors.newVirtualThreadPerTaskExecutor();
         try {
             return executor.submit(() -> model.embed(text)).get(30, TimeUnit.SECONDS);
+        } catch (TimeoutException ex) { throw new BusinessException(ErrorCode.AI_TIMEOUT); }
+        catch (InterruptedException ex) { Thread.currentThread().interrupt(); throw new BusinessException(ErrorCode.AI_CANCELLED); }
+        catch (ExecutionException ex) { throw new BusinessException(ErrorCode.AI_UPSTREAM_FAILED); }
+        finally { executor.shutdownNow(); }
+    }
+
+    /** live 批量上限 / live-mode batch size. */
+    private static final int LIVE_BATCH = 64;
+
+    /** live 批量调用 /v1/embeddings（一次请求一批）/ batched live call. */
+    private List<float[]> embed(List<String> texts) {
+        EmbeddingModel model = embeddingModels.getIfAvailable();
+        if (model == null) throw new BusinessException(ErrorCode.AI_NO_PROVIDER);
+        var executor = Executors.newVirtualThreadPerTaskExecutor();
+        try {
+            return executor.submit(() -> model.embed(texts)).get(60, TimeUnit.SECONDS);
         } catch (TimeoutException ex) { throw new BusinessException(ErrorCode.AI_TIMEOUT); }
         catch (InterruptedException ex) { Thread.currentThread().interrupt(); throw new BusinessException(ErrorCode.AI_CANCELLED); }
         catch (ExecutionException ex) { throw new BusinessException(ErrorCode.AI_UPSTREAM_FAILED); }

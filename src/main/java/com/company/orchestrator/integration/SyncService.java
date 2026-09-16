@@ -132,6 +132,19 @@ public class SyncService {
         return Map.of("projectId", projectId, "remoteTasks", fetched.tasks().size(), "added", added, "updated", updated, "cancelled", cancelled);
     }
 
+    /** 已从该来源导入的项目（含刷新入口所需状态）/ imported projects with refresh-relevant state. */
+    public List<Map<String, Object>> imports(String source) {
+        var client = client(source);
+        return db.queryForList("""
+                select l.internal_id "projectId", p.name "projectName", p.status "projectStatus",
+                       l.external_id "externalId", l.url, l.synced_at "syncedAt",
+                       (select count(*) from task t where t.project_id = l.internal_id and t.status not in ('CANCELLED','DONE')) "openTasks",
+                       (select count(*) from resource_allocation a where a.project_id = l.internal_id and a.status in ('PLANNED','CONFIRMED')) "activeAllocations"
+                from integration_link l join project p on p.id = l.internal_id
+                where l.source = ? and l.external_type = 'PROJECT'
+                order by l.internal_id""", client.source());
+    }
+
     /** 已导入项目的映射明细 / mapping detail of an imported project. */
     public List<Map<String, Object>> links(String source, long projectId) {
         var client = client(source);

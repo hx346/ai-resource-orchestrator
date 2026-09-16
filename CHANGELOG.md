@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+### Added
+- External sync now fetches every page (Jira `startAt`, GitLab / ZenTao `limit`+`page`, capped at 20 pages of 100) instead of the first 100–200 items, and a new `GET /api/v1/sync/{source}/imports` lists imported projects with open-task counts, sync times and the active-allocation guard state for the settings-page refresh action.
+- Live semantic embeddings are batched (64 per `/v1/embeddings` request) during rebuild; auto replanning now reuses the active plan's solving strategy instead of hardcoding BALANCED.
+
 ## [0.7.0] - 2026-09-16
 ### Added
 - Phase 3 remainder: optional pgvector semantic skill search — a second Flyway location (`db/migration-semantic`, V900+) creates `skill_embedding` only when `SKILL_SEMANTIC_ENABLED=true` on a pgvector-enabled PostgreSQL; `local` mode embeds deterministically in-process (char-gram hash, default 256-dim) and `live` mode calls an OpenAI-compatible `/v1/embeddings` endpoint. New `GET /api/v1/skills/semantic` search + `POST /skills/semantic/rebuild`, first-enable auto backfill, and vector suggestions for unmatched names in AI skill extraction (threshold 0.5, layered over the deterministic 0.82 similarity hint).

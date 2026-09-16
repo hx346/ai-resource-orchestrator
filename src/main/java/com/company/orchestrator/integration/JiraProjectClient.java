@@ -74,17 +74,23 @@ public class JiraProjectClient implements ExternalProjectClient {
     @Override
     public ProjectWithTasks fetch(String externalId) {
         var meta = get("/rest/api/2/project/" + URLEncoder.encode(externalId, StandardCharsets.UTF_8));
-        var search = get("/rest/api/2/search?jql=" + URLEncoder.encode("project=" + externalId + " ORDER BY created ASC", StandardCharsets.UTF_8)
-                + "&maxResults=100&fields=summary,status,priority,timeoriginalestimate");
         var tasks = new ArrayList<RemoteTask>();
-        for (var issue : search.path("issues")) {
-            var fields = issue.path("fields");
-            var key = issue.path("key").asText();
-            tasks.add(new RemoteTask(issue.path("id").asText(), key, fields.path("summary").asText(key),
-                    SyncMappers.jiraStatus(fields.path("status").path("statusCategory").path("key").asText()),
-                    SyncMappers.priority(fields.path("priority").path("id").asInt(3)),
-                    SyncMappers.hours(fields.path("timeoriginalestimate").isNumber() ? fields.path("timeoriginalestimate").asInt() : null, 8),
-                    base + "/browse/" + key));
+        // startAt 分页拉全（上限 20 页）/ paged by startAt, capped at 20 pages
+        for (int startAt = 0, page = 0; page < MAX_PAGES; page++) {
+            var search = get("/rest/api/2/search?jql=" + URLEncoder.encode("project=" + externalId + " ORDER BY created ASC", StandardCharsets.UTF_8)
+                    + "&maxResults=100&startAt=" + startAt + "&fields=summary,status,priority,timeoriginalestimate");
+            var issues = search.path("issues");
+            for (var issue : issues) {
+                var fields = issue.path("fields");
+                var key = issue.path("key").asText();
+                tasks.add(new RemoteTask(issue.path("id").asText(), key, fields.path("summary").asText(key),
+                        SyncMappers.jiraStatus(fields.path("status").path("statusCategory").path("key").asText()),
+                        SyncMappers.priority(fields.path("priority").path("id").asInt(3)),
+                        SyncMappers.hours(fields.path("timeoriginalestimate").isNumber() ? fields.path("timeoriginalestimate").asInt() : null, 8),
+                        base + "/browse/" + key));
+            }
+            startAt += issues.size();
+            if (issues.size() < 100 || startAt >= search.path("total").asInt(startAt)) break;
         }
         var key = meta.path("key").asText();
         return new ProjectWithTasks(new RemoteProject(meta.path("id").asText(), key, meta.path("name").asText(),
@@ -102,6 +108,9 @@ public class JiraProjectClient implements ExternalProjectClient {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "Jira 不可达：" + ex.getMessage());
         }
     }
+
+    /** 分页上限：20 页 × 100 条 / page cap. */
+    static final int MAX_PAGES = 20;
 
     /** 5s 连接 / 20s 读取超时 / shared request factory. */
     static JdkClientHttpRequestFactory factory() {

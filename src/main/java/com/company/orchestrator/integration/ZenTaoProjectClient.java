@@ -57,13 +57,19 @@ public class ZenTaoProjectClient implements ExternalProjectClient {
 
     @Override
     public List<RemoteProject> listProjects() {
-        var body = get(paged(pathProjects));
-        var array = body.has("projects") ? body.get("projects") : body.has("data") ? body.get("data") : body;
         var projects = new ArrayList<RemoteProject>();
-        for (var item : array) {
-            if (!item.hasNonNull("id")) continue;
-            projects.add(new RemoteProject(item.path("id").asText(), item.path("code").asText(""), item.path("name").asText(),
-                    item.path("status").asText(""), null));
+        // limit=100 翻页拉全（上限 20 页）/ page through limit=100 results
+        for (int page = 1; page <= JiraProjectClient.MAX_PAGES; page++) {
+            var body = get(pathProjects + "?limit=100&page=" + page);
+            var array = body.has("projects") ? body.get("projects") : body.has("data") ? body.get("data") : body;
+            int seen = 0;
+            for (var item : array) {
+                if (!item.hasNonNull("id")) continue;
+                projects.add(new RemoteProject(item.path("id").asText(), item.path("code").asText(""), item.path("name").asText(),
+                        item.path("status").asText(""), null));
+                seen++;
+            }
+            if (seen < 100) break;
         }
         return projects;
     }
@@ -72,20 +78,25 @@ public class ZenTaoProjectClient implements ExternalProjectClient {
     public ProjectWithTasks fetch(String externalId) {
         var project = listProjects().stream().filter(p -> p.externalId().equals(externalId)).findFirst()
                 .orElseThrow(() -> new BusinessException(ErrorCode.BAD_REQUEST, "禅道项目不存在：" + externalId));
-        var body = get(paged(pathTasks.replace("{id}", externalId)));
         var tasks = new ArrayList<RemoteTask>();
-        for (var item : body.has("tasks") ? body.get("tasks") : body) {
-            if (!item.hasNonNull("id")) continue;
-            int estimate = (int) Math.round(item.path("estimate").asDouble(0));
-            tasks.add(new RemoteTask(item.path("id").asText(), "T" + item.path("id").asText(), item.path("name").asText(""),
-                    SyncMappers.genericStatus(item.path("status").asText()),
-                    SyncMappers.zentaoPriority(item.path("pri").isNumber() ? item.path("pri").asInt() : null),
-                    SyncMappers.hours(estimate == 0 ? 8 : estimate), null));
+        // limit=100 翻页拉全（上限 20 页）/ page through limit=100 results
+        for (int page = 1; page <= JiraProjectClient.MAX_PAGES; page++) {
+            var body = get(pathTasks.replace("{id}", externalId) + "?limit=100&page=" + page);
+            var array = body.has("tasks") ? body.get("tasks") : body;
+            int seen = 0;
+            for (var item : array) {
+                if (!item.hasNonNull("id")) continue;
+                int estimate = (int) Math.round(item.path("estimate").asDouble(0));
+                tasks.add(new RemoteTask(item.path("id").asText(), "T" + item.path("id").asText(), item.path("name").asText(""),
+                        SyncMappers.genericStatus(item.path("status").asText()),
+                        SyncMappers.zentaoPriority(item.path("pri").isNumber() ? item.path("pri").asInt() : null),
+                        SyncMappers.hours(estimate == 0 ? 8 : estimate), null));
+                seen++;
+            }
+            if (seen < 100) break;
         }
         return new ProjectWithTasks(project, tasks);
     }
-
-    private String paged(String path) { return path + (path.contains("?") ? "&" : "?") + "limit=200"; }
 
     private JsonNode get(String uri) {
         try {

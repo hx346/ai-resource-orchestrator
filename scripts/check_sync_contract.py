@@ -61,6 +61,15 @@ def main():
     assert refresh['remoteTasks'] == 3 and refresh['added'] == 0 and refresh['updated'] == 3, refresh
     print(f'PASS: jira import ({result["tasksImported"]} tasks, window {result["startDate"]}→{result["endDate"]}), duplicate guard, incremental refresh')
 
+    # ---- Jira BULK：250 条 issue 验证 startAt 分页拉全 / paged fetch lands every issue ----
+    bulk = next(p for p in call('/sync/jira/projects') if p['key'] == 'BULK')
+    bulk_result = call('/sync/jira/import', 'POST', {'externalId': bulk['externalId']})
+    assert bulk_result['tasksImported'] == 250, bulk_result
+    imported = call('/sync/jira/imports')
+    assert any(i['projectId'] == pid and i['openTasks'] == 2 for i in imported), imported
+    assert any(i['projectId'] == bulk_result['projectId'] and i['openTasks'] == 250 for i in imported), imported
+    print(f"PASS: jira paged fetch imports all 250 bulk issues; imports listing shows both projects")
+
     # ---- GitLab：列 + 导入 ----
     gl_projects = call('/sync/gitlab/projects')
     pipeline = next(p for p in gl_projects if p['externalId'] == '77')

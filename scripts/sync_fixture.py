@@ -18,7 +18,8 @@ GITLAB_TOKEN = "glpat-demo"
 ZENTAO_TOKEN = "zt-demo-token"
 
 # 固定数据：一个 Jira 项目（含已完成 / 进行中 issue）、一个 GitLab 项目、一个禅道项目
-JIRA_PROJECTS = [{"id": "10001", "key": "WEB", "name": "Website Revamp", "archived": False}]
+JIRA_PROJECTS = [{"id": "10001", "key": "WEB", "name": "Website Revamp", "archived": False},
+                 {"id": "10002", "key": "BULK", "name": "Bulk Migration", "archived": False}]
 JIRA_ISSUES = [
     {"id": "101", "key": "WEB-1", "fields": {"summary": "Design homepage", "status": {"statusCategory": {"key": "done"}},
      "priority": {"id": "2"}, "timeoriginalestimate": 14400}},
@@ -27,6 +28,10 @@ JIRA_ISSUES = [
     {"id": "103", "key": "WEB-3", "fields": {"summary": "QA and rollout", "status": {"statusCategory": {"key": "new"}},
      "priority": {"id": "3"}, "timeoriginalestimate": None}},
 ]
+# 250 条 issue 用于验证 startAt 分页拉全 / 250 issues to prove startAt pagination
+BULK_ISSUES = [{"id": str(200 + i), "key": f"BULK-{i + 1}", "fields": {"summary": f"Batch item {i + 1}",
+                "status": {"statusCategory": {"key": "new"}}, "priority": {"id": "3"},
+                "timeoriginalestimate": 3600}} for i in range(250)]
 GITLAB_PROJECTS = [{"id": 77, "path": "data-pipeline", "name": "Data Pipeline", "archived": False, "web_url": "http://fixture/data-pipeline"}]
 GITLAB_ISSUES = [
     {"iid": 11, "title": "Ingest CDC stream", "state": "opened", "weight": 2, "web_url": "http://fixture/issues/11"},
@@ -74,7 +79,12 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.path == "/rest/api/2/search":
             if not self._authorized("jira"):
                 return self._send({"errors": []}, 401)
-            return self._send({"issues": JIRA_ISSUES})
+            jql = query.get("jql", [""])[0]
+            items = BULK_ISSUES if "BULK" in jql or "10002" in jql else JIRA_ISSUES
+            max_results = int(query.get("maxResults", ["100"])[0])
+            start_at = int(query.get("startAt", ["0"])[0])
+            return self._send({"startAt": start_at, "maxResults": max_results,
+                               "total": len(items), "issues": items[start_at:start_at + max_results]})
         # ---- GitLab v4 ----
         if parsed.path == "/api/v4/projects":
             return self._send(GITLAB_PROJECTS if self._authorized("gitlab") else [], 200 if self._authorized("gitlab") else 401)

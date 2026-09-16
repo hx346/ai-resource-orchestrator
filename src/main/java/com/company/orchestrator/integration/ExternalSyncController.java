@@ -47,6 +47,12 @@ public class ExternalSyncController {
         return Result.ok(service.refresh(source, request.projectId()));
     }
 
+    @Operation(summary = "已导入项目列表（含刷新状态）/ Imported projects with refresh-relevant state")
+    @GetMapping("/{source}/imports")
+    public Result<?> imports(@PathVariable String source) {
+        return Result.ok(service.imports(source));
+    }
+
     @Operation(summary = "查看项目的同步映射 / Mapping detail of an imported project")
     @GetMapping("/{source}/links")
     public Result<?> links(@PathVariable String source, @RequestParam long projectId) {
