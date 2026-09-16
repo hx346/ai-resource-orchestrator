@@ -1,6 +1,7 @@
 package com.company.orchestrator.skill.controller;
 
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -38,6 +39,7 @@ public class SkillController {
     private final SkillService skillService;
     private final SkillAliasService aliasService;
     private final SkillNormalizer skillNormalizer;
+    private final com.company.orchestrator.skill.service.SkillSemanticService semantic;
 
     @Operation(summary = "技能分页查询 / Page skills")
     @GetMapping
@@ -73,6 +75,18 @@ public class SkillController {
     @GetMapping("/normalize")
     public Result<SkillNormalizer.NormalizedSkill> normalize(@RequestParam String name) {
         return Result.ok(skillNormalizer.normalize(name).orElse(null));
+    }
+
+    @Operation(summary = "技能语义检索（可选 pgvector）/ Semantic skill search (optional pgvector)")
+    @GetMapping("/semantic")
+    public Result<?> semantic(@RequestParam String q, @RequestParam(defaultValue = "10") int limit) {
+        return Result.ok(Map.of("status", semantic.status(), "query", q, "rows", semantic.search(q, limit)));
+    }
+
+    @Operation(summary = "重建技能向量（切换嵌入模式后执行）/ Rebuild skill vectors")
+    @PostMapping("/semantic/rebuild")
+    public Result<?> rebuildSemantic() {
+        return Result.ok(semantic.rebuild());
     }
 
     @Operation(summary = "技能别名列表 / List aliases of a skill")

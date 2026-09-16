@@ -33,7 +33,8 @@ spring:
   ai:
     model:
       chat: ${AI_CHAT_PROVIDER:none}
-      embedding: none
+      # 语义检索 live 模式需要 embeddings 提供方 / embeddings provider for live semantic mode
+      embedding: ${AI_EMBEDDING_PROVIDER:none}
       image: none
       moderation: none
       audio:
@@ -46,6 +47,9 @@ spring:
         options:
           model: ${AI_MODEL:gpt-4o-mini}
           temperature: 0.2
+      embedding:
+        options:
+          model: ${EMBEDDING_MODEL:text-embedding-3-small}
 
   cache:
     type: caffeine
@@ -75,3 +79,9 @@ app:
     mode: ${NOTIFY_MODE:off}
     provider: ${NOTIFY_PROVIDER:generic}
     webhook-url: ${NOTIFY_WEBHOOK_URL:}
+  # 语义技能检索（Phase 3，可选）：需要支持 pgvector 的 PostgreSQL（如 pgvector/pgvector:pg16）
+  # semantic skill search (optional): requires a pgvector-enabled PostgreSQL
+  skill-semantic:
+    enabled: ${SKILL_SEMANTIC_ENABLED:false}
+    embedding-mode: ${SKILL_SEMANTIC_MODE:local}   # local 确定性哈希 / live 走 OpenAI 兼容 /v1/embeddings
+    dim: ${SKILL_SEMANTIC_DIM:256}

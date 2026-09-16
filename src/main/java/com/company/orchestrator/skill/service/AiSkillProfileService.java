@@ -61,6 +61,7 @@ public class AiSkillProfileService {
     private final SkillNormalizer normalizer;
     private final ObjectMapper json;
     private final JdbcTemplate db;
+    private final SkillSemanticService semantic;
 
     public Map<String, Object> extract(long employeeId, AiSkillExtractRequest request) {
         var employee = employees.requireExists(employeeId);
@@ -98,6 +99,9 @@ public class AiSkillProfileService {
                         Skill best = null; double bestScore = 0;
                         for (var skill : catalog) { double v = SkillSimilarity.score(s.name(), skill.getName()); if (v > bestScore) { bestScore = v; best = skill; } }
                         if (best != null && bestScore >= SkillSimilarity.THRESHOLD) { suggestedId = best.getId(); suggestedName = best.getName(); similarity = bestScore; }
+                        // 语义向量建议（启用 pgvector 时可能优于字面相似度）/ vector suggestion when semantic search is on
+                        var vector = semantic.suggest(s.name());
+                        if (vector != null && (suggestedId == null || vector.score() > similarity)) { suggestedId = vector.skillId(); suggestedName = vector.skillName(); similarity = vector.score(); }
                     }
                     items.add(new AiSkillDraftItem(s.name().trim(),
                             normalized == null ? null : normalized.skillId(),
