@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 - Phase 3 remainder: optional pgvector semantic skill search — a second Flyway location (`db/migration-semantic`, V900+) creates `skill_embedding` only when `SKILL_SEMANTIC_ENABLED=true` on a pgvector-enabled PostgreSQL; `local` mode embeds deterministically in-process (char-gram hash, default 256-dim) and `live` mode calls an OpenAI-compatible `/v1/embeddings` endpoint. New `GET /api/v1/skills/semantic` search + `POST /skills/semantic/rebuild`, first-enable auto backfill, and vector suggestions for unmatched names in AI skill extraction (threshold 0.5, layered over the deterministic 0.82 similarity hint).
+- Phase 4 remainder: event-driven auto replanning — availability windows, skill-profile writes, skill-library edits and project-window changes now enqueue an after-commit asynchronous patrol of affected active plans (`REPLAN_AUTO_TRIGGER=off|detect|auto`, cooldown `REPLAN_COOLDOWN_MINUTES`). `detect` pushes a `REPLAN_SUGGESTED` webhook (draft plan id included when present); `auto` additionally drafts a replacement plan (BALANCED) that still requires human confirmation. All decisions land in the new `replan_trigger_log` table exposed via `GET /api/v1/replan/triggers`.
 
 ### Fixed
 - LLM output parsing now strips reasoning-model `<think>…</think>` blocks (Qwen3 / DeepSeek-R1 style, truncated blocks tolerated) before JSON deserialization; shared `AiText.clean` replaces the duplicated fence-stripping in both AI planning and AI skill extraction.

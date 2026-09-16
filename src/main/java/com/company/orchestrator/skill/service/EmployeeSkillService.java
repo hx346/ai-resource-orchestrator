@@ -32,6 +32,7 @@ public class EmployeeSkillService {
     private final EmployeeSkillMapper employeeSkillMapper;
     private final SkillMapper skillMapper;
     private final EmployeeService employeeService;
+    private final com.company.orchestrator.allocation.ReplanTriggerService replan;
 
     /** 查询员工技能（带技能名，两次查询避免 join 映射）/ List employee skills with skill names. */
     public List<EmployeeSkillView> listByEmployee(Long employeeId) {
@@ -75,5 +76,7 @@ public class EmployeeSkillService {
             employeeSkillMapper.insert(employeeSkill);
         }
         log.info("employee skills replaced, employeeId={}, size={}", employeeId, requests.size());
+        // 画像变化可能使生效分配出现技能缺口，提交后异步巡检 / profile changes may invalidate active bookings
+        replan.onEmployeeEvent(employeeId, "SKILL_PROFILE_CHANGED");
     }
 }

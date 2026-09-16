@@ -68,6 +68,18 @@ public class NotifyService {
                         "start", start.toString(), "end", end.toString(), "affectedProjects", affected.stream().limit(20).toList())));
     }
 
+    /** 自动重规划触发提醒（Phase 4 余项）：detect 模式仅提醒，auto 模式附带已生成的草稿方案 / auto-replan trigger notice. */
+    public void replanSuggested(long projectId, long planId, int version, int conflictCount,
+            Long draftPlanId, String triggerMode, List<Map<String, Object>> conflicts) {
+        var projectName = db.queryForObject("select name from project where id=?", String.class, projectId);
+        afterCommit(() -> dispatch("REPLAN_SUGGESTED",
+                "【资源编排】项目「%s」方案 v%d 与最新基础数据存在 %d 项冲突%s。请前往重规划处理。"
+                        .formatted(projectName, version, conflictCount, draftPlanId == null ? "" : "，已自动生成重规划草稿方案 #" + draftPlanId + "（待人工确认）"),
+                Map.of("projectId", projectId, "planId", planId, "planVersion", version,
+                        "conflictCount", conflictCount, "draftPlanId", draftPlanId == null ? 0 : draftPlanId,
+                        "triggerMode", triggerMode, "conflicts", conflicts.stream().limit(5).toList())));
+    }
+
     /** 事务内注册提交后发送；无事务时直接发送 / send after commit when inside a transaction. */
     private void afterCommit(Runnable send) {
         if (!"live".equals(mode) || webhookUrl == null || webhookUrl.isBlank()) return;

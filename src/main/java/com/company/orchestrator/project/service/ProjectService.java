@@ -30,6 +30,7 @@ public class ProjectService {
     private final ProjectMilestoneMapper milestoneMapper;
     private final TaskMapper taskMapper;
     private final org.springframework.jdbc.core.JdbcTemplate db;
+    private final com.company.orchestrator.allocation.ReplanTriggerService replan;
     public void lock(Long id) { db.queryForList("select id from project where id=? for update",id); requireExists(id); }
 
 
@@ -64,6 +65,8 @@ public class ProjectService {
         Project project = requireExists(id);
         apply(project, request);
         projectMapper.updateById(project);
+        // 项目周期变化可能使生效分配落在窗口外 / window changes may push bookings outside the project
+        replan.onProjectEvent(id, "PROJECT_UPDATED");
     }
 
     /** 删除项目（级联删除里程碑与任务）/ Delete project with milestones and tasks. */

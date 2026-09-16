@@ -61,6 +61,7 @@ public class AiSkillProfileService {
     private final SkillNormalizer normalizer;
     private final ObjectMapper json;
     private final JdbcTemplate db;
+    private final com.company.orchestrator.allocation.ReplanTriggerService replan;
     private final SkillSemanticService semantic;
 
     public Map<String, Object> extract(long employeeId, AiSkillExtractRequest request) {
@@ -162,6 +163,8 @@ public class AiSkillProfileService {
             written++;
         }
         log.info("ai skill draft accepted, employeeId={}, size={}", employeeId, written);
+        // 画像变化可能使生效分配出现技能缺口，提交后异步巡检 / profile changes may invalidate active bookings
+        replan.onEmployeeEvent(employeeId, "SKILL_PROFILE_CHANGED");
         return written;
     }
 

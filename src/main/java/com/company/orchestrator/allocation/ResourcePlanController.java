@@ -8,6 +8,7 @@ import com.company.orchestrator.common.result.Result;
 public class ResourcePlanController {
     private final ResourcePlanService service;
     private final ResourceTimelineService timeline;
+    private final ReplanTriggerService triggers;
     public record SolveRequest(String strategy) {}
     @GetMapping("/allocations/timeline") public Result<?> timeline() { return Result.ok(timeline.timeline()); }
     @GetMapping("/projects/{id}/candidates") public Result<?> candidates(@PathVariable long id) { return Result.ok(service.candidates(id)); }
@@ -15,6 +16,7 @@ public class ResourcePlanController {
     @PostMapping("/projects/{id}/replan") public Result<Long> replan(@PathVariable long id,@RequestBody(required=false) SolveRequest r,Principal p) { return Result.ok(service.replan(id,r==null||r.strategy()==null?"BALANCED":r.strategy(),p.getName())); }
     @GetMapping("/projects/{id}/replan/impact") public Result<?> impact(@PathVariable long id) { return Result.ok(service.impact(id)); }
     @GetMapping("/replan/alerts") public Result<?> alerts() { return Result.ok(service.alerts()); }
+    @GetMapping("/replan/triggers") public Result<?> triggerLog(@RequestParam(defaultValue="20") int limit) { return Result.ok(triggers.triggers(limit)); }
     @GetMapping("/projects/{id}/resource-plans") public Result<?> list(@PathVariable long id) { return Result.ok(service.list(id)); }
     @GetMapping("/resource-plans/{id}") public Result<?> get(@PathVariable long id) { return Result.ok(service.get(id)); }
     @GetMapping("/resource-plans/compare") public Result<?> compare(@RequestParam long left,@RequestParam long right) { return Result.ok(service.compare(left,right)); }

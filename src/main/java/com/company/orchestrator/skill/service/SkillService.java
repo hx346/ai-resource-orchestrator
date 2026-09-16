@@ -30,6 +30,7 @@ public class SkillService {
     private final SkillCategoryService categoryService;
     /** 由 project 模块实现，查询任务需求引用 / Implemented by the project module. */
     private final SkillUsagePort skillUsagePort;
+    private final com.company.orchestrator.allocation.ReplanTriggerService replan;
 
     public IPage<Skill> page(long pageNum, long pageSize, String keyword, Long categoryId) {
         LambdaQueryWrapper<Skill> wrapper = new LambdaQueryWrapper<Skill>()
@@ -68,6 +69,8 @@ public class SkillService {
 
         apply(skill, request);
         skillMapper.updateById(skill);
+        // 技能停用等变化可能使生效分配出现技能缺口 / skill changes may invalidate active bookings
+        replan.onSkillEvent(id, "SKILL_CHANGED");
     }
 
     @Transactional(rollbackFor = Exception.class)

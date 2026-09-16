@@ -79,6 +79,11 @@ app:
     mode: ${NOTIFY_MODE:off}
     provider: ${NOTIFY_PROVIDER:generic}
     webhook-url: ${NOTIFY_WEBHOOK_URL:}
+  # 事件自动触发重规划（Phase 4）：off 关闭 / detect 仅提醒 / auto 额外生成重规划草稿（仍须人工确认）
+  # event-driven replanning: off | detect (notify only) | auto (also draft a replan)
+  replan:
+    auto-trigger: ${REPLAN_AUTO_TRIGGER:off}
+    cooldown-minutes: ${REPLAN_COOLDOWN_MINUTES:30}
   # 语义技能检索（Phase 3，可选）：需要支持 pgvector 的 PostgreSQL（如 pgvector/pgvector:pg16）
   # semantic skill search (optional): requires a pgvector-enabled PostgreSQL
   skill-semantic:
