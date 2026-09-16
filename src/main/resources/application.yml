@@ -90,3 +90,20 @@ app:
     enabled: ${SKILL_SEMANTIC_ENABLED:false}
     embedding-mode: ${SKILL_SEMANTIC_MODE:local}   # local 确定性哈希 / live 走 OpenAI 兼容 /v1/embeddings
     dim: ${SKILL_SEMANTIC_DIM:256}
+  # 外部项目同步（Phase 5，单向导入）/ external project sync (one-way import)
+  sync:
+    jira:
+      enabled: ${SYNC_JIRA_ENABLED:false}
+      base-url: ${SYNC_JIRA_BASE_URL:}
+      username: ${SYNC_JIRA_USERNAME:}
+      api-token: ${SYNC_JIRA_API_TOKEN:}
+    gitlab:
+      enabled: ${SYNC_GITLAB_ENABLED:false}
+      base-url: ${SYNC_GITLAB_BASE_URL:}
+      token: ${SYNC_GITLAB_TOKEN:}
+    zentao:
+      enabled: ${SYNC_ZENTAO_ENABLED:false}
+      base-url: ${SYNC_ZENTAO_BASE_URL:}
+      token: ${SYNC_ZENTAO_TOKEN:}
+      path-projects: ${SYNC_ZENTAO_PATH_PROJECTS:/api.php/v1/projects}
+      path-tasks: ${SYNC_ZENTAO_PATH_TASKS:/api.php/v1/projects/{id}/tasks}
