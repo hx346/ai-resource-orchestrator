@@ -153,8 +153,58 @@ test('leave conflict triggers impact analysis and atomic replan swap',async({pag
   await expect(page.getByRole('heading',{name:'看清组织的能力边界。'})).toBeVisible();
   await expect(page.locator('.sd-table tbody')).toContainText('Java');
   await page.getByRole('button',{name:/缺口趋势/}).click();
-  await expect(page.locator('.trend-table')).toBeVisible();
+  // 趋势是全库口径：有缺口出表、无缺口出空态文案，两者都算通过 / org-wide trends: table or empty-state text
+  await expect(page.locator('.trend-table').or(page.getByText(/均无技能缺口/))).toBeVisible();
   await page.getByRole('button',{name:/生成建议/}).click();
   await expect(page.locator('.review')).toContainText('演示规则说明');
+  expect(errors).toEqual([]);
+});
+
+async function login(page:import('@playwright/test').Page){
+  await page.goto('/');await page.waitForLoadState('networkidle');
+  await page.getByLabel('用户名',{exact:true}).fill('admin');
+  await page.getByLabel('密码').fill(process.env.ARO_ADMIN_PASSWORD!);
+  await page.getByRole('button',{name:'进入工作台'}).click();
+  await expect(page.getByRole('heading',{name:'把目标，变成团队的下一步。'})).toBeVisible();
+}
+test('capability: weekly model switch and market benchmark import',async({page})=>{
+  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
+  await login(page);
+  await page.getByRole('button',{name:/团队成员/}).click();
+  if(await page.getByRole('button',{name:'载入 10 位演示员工'}).isVisible())await page.getByRole('button',{name:'载入 10 位演示员工'}).click();
+  // 等演示数据加载完成（busy 清零）再切页签，否则 run() 守卫会丢弃 loadCapability / wait for idle before switching tabs
+  await expect(page.getByRole('button',{name:/陈知远/}).first()).toBeVisible({timeout:30000});
+  await page.getByRole('button',{name:/能力决策/}).click();
+  await expect(page.getByRole('heading',{name:'看清组织的能力边界。'})).toBeVisible();
+  // 按周精化模型切换 / weekly-refined model switch
+  await page.getByLabel('供给模型').selectOption('weekly');
+  await expect(page.getByText(/按周精化（逐周扣占用与休假/)).toBeVisible();
+  await expect(page.locator('.sd-table thead')).toContainText('市场');
+  // 市场数据导入 → 出现行 → 删除 / market import then delete
+  await page.getByRole('button',{name:/导入市场数据/}).click();
+  await page.getByLabel('技能').selectOption({index:1});
+  await page.getByLabel(/市场紧张度/).fill('85');
+  await page.getByRole('dialog').getByRole('button',{name:'保存',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'市场参考数据 1'})).toBeVisible();
+  await expect(page.getByText('manual').first()).toBeVisible();
+  page.once('dialog',d=>d.accept());
+  await page.getByRole('button',{name:'删除市场数据'}).click();
+  await expect(page.getByText('尚未导入市场数据')).toBeVisible();
+  expect(errors).toEqual([]);
+});
+test('settings sync guard and semantic search guard',async({page})=>{
+  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
+  await login(page);
+  // 未配置外部系统：列出项目给出明确错误 / unconfigured sync surfaces a typed error
+  await page.getByRole('button',{name:/组织与设置/}).click();
+  await expect(page.getByRole('heading',{name:'外部项目同步'})).toBeVisible();
+  await page.getByRole('button',{name:'列出项目'}).click();
+  await expect(page.locator('.alert.error')).toContainText('未启用');
+  await expect(page.getByRole('heading',{name:'自动重规划触发记录'})).toBeVisible();
+  // 语义检索未启用守卫 / semantic search disabled guard
+  await page.getByRole('button',{name:/能力图谱/}).click();
+  await page.getByLabel('语义检索').fill('spring');
+  await page.getByRole('button',{name:'检索',exact:true}).click();
+  await expect(page.getByText(/语义检索未启用/)).toBeVisible();
   expect(errors).toEqual([]);
 });
