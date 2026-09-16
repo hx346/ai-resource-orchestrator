@@ -548,13 +548,45 @@ NOTIFY_PROVIDER=generic|feishu|dingtalk|wecom   # 报文格式
 NOTIFY_WEBHOOK_URL=https://... # 群机器人 webhook（日志中脱敏 query 令牌）
 ```
 
-- 事件：`PLAN_CONFIRMED`（方案确认生效）、`AVAILABILITY_CONFLICT`（不可用安排冲突，与重规划巡检同口径）
+- 事件：`PLAN_CONFIRMED`（方案确认生效）、`AVAILABILITY_CONFLICT`（不可用安排冲突，与重规划巡检同口径）、`REPLAN_SUGGESTED`（事件自动触发的重规划提醒）
+- 自动重规划（Phase 4 余项）：`REPLAN_AUTO_TRIGGER=off|detect|auto`。休假 / 技能画像 / 技能库 / 项目周期变化在事务提交后异步巡检受影响的生效方案：`detect` 推送提醒；`auto` 额外自动生成重规划草稿（仍须人工确认才换班）。冷却窗口 `REPLAN_COOLDOWN_MINUTES`（默认 30）抑制重复触发，全部动作记录在 `replan_trigger_log`（`GET /api/v1/replan/triggers`，设置页可查看）
 - 记录：所有发送尝试写入 `notification_log`（类型 / 状态 / 耗时 / 脱敏地址），设置页「集成通知」可查看
 - 契约测试：`scripts/notify_fixture.py`（本地 webhook 桩）+ `scripts/check_notify_contract.py`，与 LLM 契约测试同模式
 
+## 外部项目同步（Jira / 禅道 / GitLab）
+
+Phase 5 余项：**单向导入**。拉取外部项目与任务，落地为待规划（PLANNING）的 ARO 项目；任务按工时排默认顺序工作日排期，状态 / 优先级 / 工时归一为 ARO 口径（如 Jira statusCategory → TODO/IN_PROGRESS/DONE、估时秒转小时）。**技能需求不随导入生成**——集成只搬运事实，目标与约束由人维护。`integration_link` 表维护内外映射；项目无生效分配时可执行增量刷新（新增 / 更新 / 远端已删则取消），有生效分配时拒绝以保护已确认方案。
+
+```text
+SYNC_JIRA_ENABLED=false|true     SYNC_JIRA_BASE_URL=…  SYNC_JIRA_USERNAME=…  SYNC_JIRA_API_TOKEN=…
+SYNC_GITLAB_ENABLED=false|true   SYNC_GITLAB_BASE_URL=…  SYNC_GITLAB_TOKEN=…
+SYNC_ZENTAO_ENABLED=false|true   SYNC_ZENTAO_BASE_URL=…  SYNC_ZENTAO_TOKEN=…
+# 禅道不同版本路径有差异时覆盖（默认 /api.php/v1/projects 与 /api.php/v1/projects/{id}/tasks）
+SYNC_ZENTAO_PATH_PROJECTS=…      SYNC_ZENTAO_PATH_TASKS=…
+```
+
+- 接口：`GET /api/v1/sync/{source}/projects`、`POST /api/v1/sync/{source}/import`、`POST /api/v1/sync/{source}/refresh`、`GET /api/v1/sync/{source}/links`（source = jira / zentao / gitlab）
+- 契约测试：`scripts/sync_fixture.py`（本地 Jira/GitLab/禅道桩）+ `scripts/check_sync_contract.py`，与通知契约测试同模式
+- 假设：Jira 为 Server / DC REST v2（Cloud 兼容）；禅道为 18+ OpenAPI v1（路径可覆盖）；各取前 100/200 条（MVP 边界）
+
+## 可选能力：技能语义检索（pgvector）
+
+Phase 3 余项。默认**完全关闭**，不影响 CRUD 与求解；启用需要支持 pgvector 的 PostgreSQL（镜像 `pgvector/pgvector:pg16`），开启后 Flyway 自动追加 `db/migration-semantic`（V900 起，后启用也不需要 out-of-order）并建 `skill_embedding` 表。
+
+```text
+SKILL_SEMANTIC_ENABLED=false|true   # 总开关
+SKILL_SEMANTIC_MODE=local|live      # local：进程内确定性字符组哈希（默认，零外部依赖）；live：OpenAI 兼容 /v1/embeddings
+SKILL_SEMANTIC_DIM=256              # local 模式向量维度
+EMBEDDING_MODEL=text-embedding-3-small  # live 模式模型名
+```
+
+- 接口：`GET /api/v1/skills/semantic?q=`（带余弦得分检索）、`POST /api/v1/skills/semantic/rebuild`（切换嵌入模式后重建）；首次启用自动补齐全库向量
+- AI 技能识别中未匹配技能名在确定性相似度（0.82）之外叠加向量建议（0.5 阈值），仍只是建议、采纳由人完成
+- 本地向量不等于语义理解：同源 / 近形名相似度高（如 Spring Boot ↔ Spring Cloud），跨语言同义（k8s ↔ Kubernetes）仍依赖别名与 live 嵌入模式
+
 ## 组织能力决策
 
-Phase 6 第一片（只读分析，全部基于内部数据）：回答「缺什么能力、靠谁支撑、谁不可替代」。
+Phase 6（只读分析，全部基于内部数据）：回答「缺什么能力、靠谁支撑、谁不可替代」。
 
 ```text
 GET  /api/v1/capability/supply-demand?weeks=12   # 技能供需 Gap 预测（8/12/26 周）
@@ -563,6 +595,8 @@ GET  /api/v1/capability/leave-impact?employeeId= # 核心人员离开影响（wh
 GET  /api/v1/capability/scenario?weeks=26        # Pipeline 情景模拟（待启动项目全部并行）
 GET  /api/v1/capability/trends                   # 缺口趋势：8/12/26 周三档对比
 POST /api/v1/capability/advise?weeks=12          # AI 缺口建议（招聘/培训/外包/调配，不决策）
+GET  /api/v1/capability/supply-weekly?weeks=12   # 按周供给明细：逐周需求/供给/缺口
+POST /api/v1/capability/market/import            # 导入外部市场参考数据（紧张度/薪资/招聘周期）
 ```
 
 **供需口径（保守估计）**：
@@ -580,6 +614,10 @@ POST /api/v1/capability/advise?weeks=12          # AI 缺口建议（招聘/培�
 **缺口趋势**：8 / 12 / 26 周三档窗口的缺口人数对比——区分短期峰值与结构性短缺。
 
 **AI 建议**：对预测结果生成招聘 / 培训 / 外包 / 调配的分要点建议（demo 模式为确定性文案；live 走模型，审计 `CAPABILITY_ADVISE`），只解释、不决策。
+
+**按周精化供给模型（Phase 6 余项）**：`supply-demand?model=weekly` 与 `GET /capability/supply-weekly` 把需求按任务工作日均摊到周、供给逐周扣除生效占用与不可用天数，并对需求封顶后汇总——**同周盈余不能弥补他周缺口**，因此能捕捉平铺口径看不到的峰值短缺（前端「能力决策」页可切换双口径对比）。
+
+**外部市场参考数据（Phase 6 余项）**：管理员从招聘平台 / 薪酬报告等外部来源导入每技能的市场紧张度（0–100）、薪资区间与招聘周期（`market_skill` 表，`POST /capability/market/import`），只读叠加到供需预测行与 AI 建议中（如「紧张度 ≥70 建议尽早启动招聘」），不参与任何求解。
 
 前端「能力决策」页签提供三块视图；分析不改变任何数据，决策始终由人做。
 
@@ -1100,6 +1138,11 @@ ai-resource-orchestrator
 | `NOTIFY_MODE` | 出站通知开关 `off` / `live` | `off` |
 | `NOTIFY_PROVIDER` | 报文格式 `generic` / `feishu` / `dingtalk` / `wecom` | `generic` |
 | `NOTIFY_WEBHOOK_URL` | 群机器人 webhook 地址，`live` 时必填 | 空 |
+| `REPLAN_AUTO_TRIGGER` | 事件自动触发重规划 `off` / `detect` / `auto` | `off` |
+| `REPLAN_COOLDOWN_MINUTES` | 自动触发冷却窗口（分钟） | `30` |
+| `SKILL_SEMANTIC_ENABLED` | pgvector 语义检索开关 | `false` |
+| `SKILL_SEMANTIC_MODE` | 嵌入模式 `local`（确定性哈希）/ `live`（/v1/embeddings） | `local` |
+| `SYNC_JIRA_ENABLED` 等 | Jira / GitLab / 禅道同步开关与凭证（详见「外部项目同步」） | 关闭 |
 | `ADMIN_PASSWORD` | 首次创建管理员的密码（至少 12 字符） | 空（必填） |
 | `POSTGRES_HOST` / `POSTGRES_PORT` | 数据库地址 | `localhost` / `5432` |
 | `POSTGRES_DB` | 数据库名 | `ai_resource_orchestrator` |
@@ -1121,7 +1164,7 @@ Flyway 会自动初始化数据库，无需手工建表。
 
 - **必须用 Redis 吗？** 不需要。第一阶段缓存使用应用内 Caffeine。
 - **必须用 OpenAI 吗？** 不需要。任何兼容 OpenAI Chat Completion API 的服务（DeepSeek、Qwen、GLM、vLLM、Ollama 等）均可接入。
-- **必须安装 pgvector 吗？** 不需要。pgvector 为可选能力，MVP 阶段可关闭。
+- **必须安装 pgvector 吗？** 不需要。pgvector 为可选能力：不启用语义检索时系统零依赖；需要时用 `pgvector/pgvector:pg16` 镜像 + `SKILL_SEMANTIC_ENABLED=true` 开启（见「可选能力：技能语义检索」）。
 - **必须用 Maven 吗？** 不需要。仓库内置 Maven Wrapper（`./mvnw`），会自动下载指定版本的 Maven。
 
 ---
@@ -1193,10 +1236,10 @@ AI 解释方案
 
 - **Phase 1 — 基础 MVP**：Employee、Skill、Project、AI Planner、Skill Matching、Timefold Solver、Resource Plan
 - **Phase 2 — 增强项目资源管理**：多项目编排、资源 Timeline、Capacity Heatmap、项目资源冲突、多方案对比、能力 Gap 分析（进行中：技能级缺口分析与周度排期热力图已落地）
-- **Phase 3 — 自动能力画像**：简历解析、项目经历解析、历史任务分析、AI Skill Profile、技能自动更新（核心已落地：文本/文件识别草稿 + 归一化与相似度建议 + 历史证据采纳；向量语义检索留待 pgvector 阶段）
-- **Phase 4 — 动态重规划**：项目延期 / 人员请假 / 需求变化 / 优先级变化 / 新人加入时自动触发重新求解（Event → Impact Analysis → Solver → New Plan → AI 解释 → 人工确认）（核心已落地：影响分析 + 重规划求解 + 原子换班 + 全局巡检提醒 + 差异解释；自动触发求解与推送通知留待后续）
-- **Phase 5 — 企业系统集成**：Jira、禅道、GitLab、GitHub、飞书、钉钉、企业微信、HR 系统、ERP、MES（进行中：飞书 / 钉钉 / 企业微信 / 通用 webhook 出站通知已落地；Jira / 禅道 / GitLab 项目同步待后续）
-- **Phase 6 — 组织能力决策**：基于未来项目 Pipeline 做 Skill 供需 Gap 预测，输出招聘 / 培训 / 外包 / 调岗建议，演进为企业能力资源决策平台（核心已落地：Gap 预测 + 关键能力节点 + 离开影响 + Pipeline 情景模拟 + 缺口趋势 + AI 建议；后续可演进按周分布的精化供给模型与外部市场数据）
+- **Phase 3 — 自动能力画像**：简历解析、项目经历解析、历史任务分析、AI Skill Profile、技能自动更新（已落地：文本/文件识别草稿 + 归一化与相似度建议 + 历史证据采纳 + pgvector 向量语义检索（可选能力））
+- **Phase 4 — 动态重规划**：项目延期 / 人员请假 / 需求变化 / 优先级变化 / 新人加入时自动触发重新求解（Event → Impact Analysis → Solver → New Plan → AI 解释 → 人工确认）（已落地：影响分析 + 重规划求解 + 原子换班 + 全局巡检提醒 + 差异解释 + 事件自动触发（detect/auto 两档，草稿仍须人工确认）+ REPLAN_SUGGESTED 推送）
+- **Phase 5 — 企业系统集成**：Jira、禅道、GitLab、GitHub、飞书、钉钉、企业微信、HR 系统、ERP、MES（已落地：飞书 / 钉钉 / 企业微信 / 通用 webhook 出站通知 + Jira / 禅道 / GitLab 项目单向导入与增量刷新；GitHub / HR / ERP / MES 待后续）
+- **Phase 6 — 组织能力决策**：基于未来项目 Pipeline 做 Skill 供需 Gap 预测，输出招聘 / 培训 / 外包 / 调岗建议，演进为企业能力资源决策平台（已落地：Gap 预测（平铺 / 按周精化双口径）+ 关键能力节点 + 离开影响 + Pipeline 情景模拟 + 缺口趋势 + AI 建议 + 外部市场参考数据导入；后续可演进市场数据源直连）
 
 ### 长期方向
 

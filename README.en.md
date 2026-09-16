@@ -554,9 +554,41 @@ NOTIFY_PROVIDER=generic|feishu|dingtalk|wecom   # payload format
 NOTIFY_WEBHOOK_URL=https://... # group-bot webhook (query tokens masked in logs)
 ```
 
-- Events: `PLAN_CONFIRMED`, `AVAILABILITY_CONFLICT` (same rule as the replan patrol)
+- Events: `PLAN_CONFIRMED`, `AVAILABILITY_CONFLICT` (same rule as the replan patrol), `REPLAN_SUGGESTED` (event-driven replan notice)
+- Auto replanning (Phase 4 remainder): `REPLAN_AUTO_TRIGGER=off|detect|auto`. Leave windows, skill-profile writes, skill-library edits and project-window changes enqueue an after-commit asynchronous patrol of the affected active plans: `detect` pushes a notice; `auto` additionally drafts a replacement plan (human confirmation still required). A cooldown (`REPLAN_COOLDOWN_MINUTES`, default 30) suppresses repeats; every decision lands in `replan_trigger_log` (`GET /api/v1/replan/triggers`, shown on the settings page)
 - Every attempt is recorded in `notification_log` (type/status/duration/masked target), visible on the settings page
 - Contract test: `scripts/notify_fixture.py` (local webhook stub) + `scripts/check_notify_contract.py`, same pattern as the LLM contract test
+
+## External Project Sync (Jira / ZenTao / GitLab)
+
+Phase 5 remainder: **one-way import**. Remote projects and issues land as a PLANNING ARO project; tasks get a default sequential workday schedule with status / priority / hours normalized into ARO terms (Jira statusCategory → TODO/IN_PROGRESS/DONE, estimates in seconds → hours). **Skill requirements are not imported** — the integration moves facts only; goals and constraints stay human-authored. `integration_link` maps internal and external objects; incremental refresh (added / updated / cancelled) is allowed while the project has no active allocation set and refused otherwise.
+
+```text
+SYNC_JIRA_ENABLED=false|true     SYNC_JIRA_BASE_URL=…  SYNC_JIRA_USERNAME=…  SYNC_JIRA_API_TOKEN=…
+SYNC_GITLAB_ENABLED=false|true   SYNC_GITLAB_BASE_URL=…  SYNC_GITLAB_TOKEN=…
+SYNC_ZENTAO_ENABLED=false|true   SYNC_ZENTAO_BASE_URL=…  SYNC_ZENTAO_TOKEN=…
+# Override when your ZenTao version differs (defaults /api.php/v1/projects, /api.php/v1/projects/{id}/tasks)
+SYNC_ZENTAO_PATH_PROJECTS=…      SYNC_ZENTAO_PATH_TASKS=…
+```
+
+- API: `GET /api/v1/sync/{source}/projects`, `POST /api/v1/sync/{source}/import`, `POST /api/v1/sync/{source}/refresh`, `GET /api/v1/sync/{source}/links` (source = jira / zentao / gitlab)
+- Contract test: `scripts/sync_fixture.py` (local Jira/GitLab/ZenTao stubs) + `scripts/check_sync_contract.py`, same pattern as the notify contract test
+- Assumptions: Jira Server/DC REST v2 (Cloud tolerated); ZenTao 18+ OpenAPI v1 (paths overridable); first 100/200 items per source (MVP boundary)
+
+## Optional: Semantic Skill Search (pgvector)
+
+Phase 3 remainder. **Off by default** with zero impact on CRUD and solving; enabling requires a pgvector-enabled PostgreSQL (image `pgvector/pgvector:pg16`) — Flyway then adds `db/migration-semantic` (V900+, no out-of-order needed when enabled later) and creates `skill_embedding`.
+
+```text
+SKILL_SEMANTIC_ENABLED=false|true   # master switch
+SKILL_SEMANTIC_MODE=local|live      # local: deterministic in-process char-gram hash (default); live: OpenAI-compatible /v1/embeddings
+SKILL_SEMANTIC_DIM=256              # local-mode vector dimension
+EMBEDDING_MODEL=text-embedding-3-small
+```
+
+- API: `GET /api/v1/skills/semantic?q=` (search with cosine scores), `POST /api/v1/skills/semantic/rebuild`; the library is backfilled automatically on first enable
+- Unmatched names in AI skill extraction gain vector suggestions (0.5 bar) layered over the deterministic 0.82 similarity hint — still suggestions only, adoption is human
+- The local hash is not language understanding: related names score high (Spring Boot ↔ Spring Cloud); cross-lingual synonyms (k8s ↔ Kubernetes) still rely on aliases or the live embedding mode
 
 ## Organizational Capability Decisions
 
@@ -569,6 +601,8 @@ GET  /api/v1/capability/leave-impact?employeeId= # what-if impact if a person le
 GET  /api/v1/capability/scenario?weeks=26        # pipeline scenario (queued projects all start)
 GET  /api/v1/capability/trends                   # gap trend across 8/12/26-week windows
 POST /api/v1/capability/advise?weeks=12          # AI advice over the gaps (explains, never decides)
+GET  /api/v1/capability/supply-weekly?weeks=12   # weekly supply breakdown: demand/supply/gap per week
+POST /api/v1/capability/market/import            # import external market benchmarks
 ```
 
 **Supply/demand method (conservative)**:
@@ -586,6 +620,10 @@ POST /api/v1/capability/advise?weeks=12          # AI advice over the gaps (expl
 **Gap trends**: gap people compared across 8/12/26-week windows — separating short spikes from structural shortages.
 
 **AI advice**: bullet-point hiring / training / outsourcing / reassignment advice over the forecast (deterministic in demo mode; audited as `CAPABILITY_ADVISE` in live mode) — explanations, never decisions.
+
+**Weekly-refined supply model (Phase 6 remainder)**: `supply-demand?model=weekly` and `GET /capability/supply-weekly` spread demand over each task's workdays, deduct bookings and leave per week, and cap supply by weekly demand before summing — **surplus weeks cannot cover shortage weeks**, so peak shortages the flat model misses become visible (the frontend compares both models).
+
+**External market benchmarks (Phase 6 remainder)**: admins import per-skill market tightness (0–100), salary bands and hiring lead time from external sources (hiring platforms, salary reports) into `market_skill` (`POST /capability/market/import`); rows enrich the forecast and AI advice read-only (e.g. "tightness ≥70 — start hiring early") and never feed the solver.
 
 The frontend "Capability" tab renders all three views; analytics never mutate data — decisions stay human.
 
@@ -1107,6 +1145,11 @@ Key configuration is injected via environment variables (template in [.env.examp
 | `NOTIFY_MODE` | Outbound notifications `off` / `live` | `off` |
 | `NOTIFY_PROVIDER` | Payload format `generic` / `feishu` / `dingtalk` / `wecom` | `generic` |
 | `NOTIFY_WEBHOOK_URL` | Group-bot webhook URL, required in live mode | empty |
+| `REPLAN_AUTO_TRIGGER` | Event-driven auto replanning `off` / `detect` / `auto` | `off` |
+| `REPLAN_COOLDOWN_MINUTES` | Trigger cooldown window (minutes) | `30` |
+| `SKILL_SEMANTIC_ENABLED` | pgvector semantic search switch | `false` |
+| `SKILL_SEMANTIC_MODE` | Embedding mode `local` (deterministic hash) / `live` (/v1/embeddings) | `local` |
+| `SYNC_JIRA_ENABLED` etc. | Jira / GitLab / ZenTao sync switches and credentials (see "External Project Sync") | off |
 | `ADMIN_PASSWORD` | First-start admin password (at least 12 characters) | empty (required) |
 | `POSTGRES_HOST` / `POSTGRES_PORT` | Database host / port | `localhost` / `5432` |
 | `POSTGRES_DB` | Database name | `ai_resource_orchestrator` |
@@ -1128,7 +1171,7 @@ Flyway initializes the database automatically — no manual DDL needed.
 
 - **Do I need Redis?** No. Phase 1 caching uses in-process Caffeine.
 - **Do I need OpenAI?** No. Any OpenAI Chat Completion-compatible service works (DeepSeek, Qwen, GLM, vLLM, Ollama, etc.).
-- **Do I need pgvector?** No. pgvector is optional and can stay disabled in the MVP.
+- **Do I need pgvector?** No. Semantic search is off by default with zero dependencies; when needed, run the `pgvector/pgvector:pg16` image with `SKILL_SEMANTIC_ENABLED=true` (see "Optional: Semantic Skill Search").
 - **Do I need Maven installed?** No. The repo bundles the Maven Wrapper (`./mvnw`), which downloads a pinned Maven version automatically.
 
 ---
@@ -1200,10 +1243,10 @@ Once this loop runs end to end, the MVP is a success.
 
 - **Phase 1 — Foundation MVP**: Employee, Skill, Project, AI Planner, Skill Matching, Timefold Solver, Resource Plan
 - **Phase 2 — Richer resource management**: multi-project orchestration, resource timeline, capacity heatmap, cross-project conflicts, plan comparison, capability gap analysis (in progress: skill-level gap analysis and the weekly capacity timeline are shipped)
-- **Phase 3 — Automated skill profiles**: resume parsing, project history parsing, historical task analysis, AI skill profile, automatic skill updates (core shipped: text/file draft extraction + normalization with similarity hints + history-evidence adoption; vector semantic search waits for the pgvector phase)
-- **Phase 4 — Dynamic replanning**: automatically re-solve on delays / leave / requirement changes / priority changes / new hires (Event → Impact Analysis → Solver → New Plan → AI explanation → Human confirmation) (core shipped: impact analysis + replan solving + atomic swap + org-wide patrol alerts + diff explanations; automatic solving triggers and push notifications come later)
-- **Phase 5 — Enterprise integrations**: Jira, ZenTao, GitLab, GitHub, Feishu, DingTalk, WeCom, HR systems, ERP, MES (in progress: Feishu / DingTalk / WeCom / generic outbound webhook notifications shipped; Jira / ZenTao / GitLab project sync comes later)
-- **Phase 6 — Organizational capability decisions**: skill supply/demand gap forecasting based on the future project pipeline, with hiring / training / outsourcing / transfer suggestions — evolving into an enterprise resource intelligence platform (core shipped: gap forecast + key people + leave impact + pipeline scenarios + gap trends + AI advice; weekly-granular supply models and external market data are future refinements)
+- **Phase 3 — Automated skill profiles**: resume parsing, project history parsing, historical task analysis, AI skill profile, automatic skill updates (shipped: text/file draft extraction + normalization with similarity hints + history-evidence adoption + pgvector vector semantic search, optional)
+- **Phase 4 — Dynamic replanning**: automatically re-solve on delays / leave / requirement changes / priority changes / new hires (Event → Impact Analysis → Solver → New Plan → AI explanation → Human confirmation) (shipped: impact analysis + replan solving + atomic swap + org-wide patrol alerts + diff explanations + event-driven triggers (detect/auto, drafts still need human confirmation) + REPLAN_SUGGESTED push)
+- **Phase 5 — Enterprise integrations**: Jira, ZenTao, GitLab, GitHub, Feishu, DingTalk, WeCom, HR systems, ERP, MES (shipped: Feishu / DingTalk / WeCom / generic outbound webhook notifications + one-way Jira / ZenTao / GitLab project import with incremental refresh; GitHub / HR / ERP / MES come later)
+- **Phase 6 — Organizational capability decisions**: skill supply/demand gap forecasting based on the future project pipeline, with hiring / training / outsourcing / transfer suggestions — evolving into an enterprise resource intelligence platform (shipped: gap forecast (flat and weekly-refined models) + key people + leave impact + pipeline scenarios + gap trends + AI advice + imported external market benchmarks; direct market-data connectors are future work)
 
 ### Long-term Direction
 
