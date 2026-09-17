@@ -185,7 +185,7 @@ def main():
     cands=a.call(f'/projects/{aid}/candidates')
     a.call(f'/resource-plans/{plan_id}/items','PUT',cands[:2],status=400)
     a.call(f'/resource-plans/{plan_id}/items','PUT',[{'taskId':c['taskId'],'employeeId':999999999} for c in cands],status=400)
-    a.call(f'/resource-plans/{plan_id}/items','PUT',[{'taskId':c['taskId'],'employeeId':c['candidates'][-1]['employeeId']} for c in cands])  # 合法编辑须紧随求解（哈希为全库口径）
+    a.call(f'/resource-plans/{plan_id}/items','PUT',[{'taskId':c['taskId'],'employeeId':c['candidates'][-1]['employeeId']} for c in cands])  # 合法编辑须紧随求解（项目域哈希；人员/全局占用变化仍会使草稿过期）
     a.call(f'/tasks/{ids[0]}','PUT',{'name':draft['tasks'][0]['name'],'startDate':draft['tasks'][0]['startDate'],'endDate':draft['tasks'][0]['endDate'],'estimatedHours':draft['tasks'][0]['estimatedHours'],'priority':3})  # 草稿期任务可编辑（无生效分配，但会使草稿过期）
     fresh_plan=a.call(f'/projects/{aid}/solve','POST',{'strategy':'BALANCED'})             # 上一编辑已变哈希 → 重解新草稿
     a.call(f'/resource-plans/{fresh_plan}/confirm','POST')

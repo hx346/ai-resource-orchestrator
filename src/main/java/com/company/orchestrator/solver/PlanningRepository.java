@@ -46,13 +46,27 @@ public class PlanningRepository {
         var windows=db.query("select * from employee_availability order by id",(rs,n) -> new Window(rs.getLong("employee_id"),rs.getObject("start_date",LocalDate.class),rs.getObject("end_date",LocalDate.class),rs.getBigDecimal("capacity").movePointRight(2).intValue(),rs.getString("type")));
         Object[] bookingArgs=excludeBookingsOfProject==null?new Object[0]:new Object[]{excludeBookingsOfProject};
         var bookings=db.query("select * from resource_allocation where status in ('PLANNED','CONFIRMED')"+(excludeBookingsOfProject==null?"":" and project_id<>?")+" order by id",(rs,n) -> new Booking(rs.getLong("employee_id"),rs.getObject("start_date",LocalDate.class),rs.getObject("end_date",LocalDate.class),rs.getBigDecimal("allocation").movePointRight(2).intValue()),bookingArgs);
-        return new Input(projectId,tasks,people,windows,bookings,hash());
+        return new Input(projectId,tasks,people,windows,bookings,hash(projectId));
     }
-    public String hash() {
+    /**
+     * 乐观新鲜度哈希：项目域表（project/task/dependency/requirement）只取本项目行，
+     * 组织域表（employee/employee_skill/skill/employee_availability/resource_allocation）保持全量——
+     * 人员与跨项目占用影响任意项目的候选和容量。他项目建任务不再误伤本项目草稿。
+     * Optimistic-freshness hash: project tables scope to this project, org tables stay
+     * whole (they feed candidacy and cross-project capacity for every project), so
+     * task creation elsewhere no longer invalidates this project's drafts.
+     */
+    public String hash(Long projectId) {
         try {
             MessageDigest digest=MessageDigest.getInstance("SHA-256");
-            for(String table:List.of("project","task","task_dependency","task_skill_requirement","employee","employee_skill","skill","employee_availability","resource_allocation"))
-                for(String row:db.queryForList("select row_to_json(t)::text from "+table+" t order by id",String.class)) digest.update((table+row+"\n").getBytes(StandardCharsets.UTF_8));
+            String filter=projectId==null?"":"where t.id="+projectId;
+            for(Object[] table:new Object[][]{
+                    {"project",filter},
+                    {"task",projectId==null?"":"where t.project_id="+projectId},
+                    {"task_dependency",projectId==null?"":"where t.successor_task_id in (select id from task where project_id="+projectId+")"},
+                    {"task_skill_requirement",projectId==null?"":"where t.task_id in (select id from task where project_id="+projectId+")"},
+                    {"employee",""},{"employee_skill",""},{"skill",""},{"employee_availability",""},{"resource_allocation",""}})
+                for(String row:db.queryForList("select row_to_json(t)::text from "+table[0]+" t "+table[1]+" order by id",String.class)) digest.update((table[0]+row+"\n").getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(digest.digest());
         } catch(java.security.NoSuchAlgorithmException ex) { throw new IllegalStateException(ex); }
     }

@@ -23,6 +23,9 @@ class Client:
         assert actual==status,(path,actual,payload.decode()[:1000])
         parsed=json.loads(payload)
         return parsed.get('data')
+    def raw(self,path):
+        r=self.opener.open(urllib.request.Request(BASE+path,headers={'Accept-Language':'zh-CN'}),timeout=100)
+        return r.status,r.read()
     def login(self,name,password):
         self.csrf=self.call('/auth/csrf')
         self.opener.open(urllib.request.Request(BASE+'/auth/login',method='POST',data=urllib.parse.urlencode({'username':name,'password':password}).encode(),headers={self.csrf['headerName']:self.csrf['token']})).read()
@@ -109,6 +112,25 @@ def main():
     assert detailed['gapSummary'][0]['taskCount']==1 and detailed['gapSummary'][0]['totalHours']==8,detailed['gapSummary']
     a.call(f'/resource-plans/{skill_gap_id}/cancel','POST')
     print('PASS: skill-level gap analysis reports missing skills and aggregation')
+    # 哈希收敛为项目域：他项目建任务不误伤本项目草稿 / project-scoped hash
+    scope_p=a.call('/projects','POST',{**project,'name':'Scope '+suffix})
+    a.call(f'/projects/{scope_p}/tasks','POST',{'name':'范围外任务','startDate':'2026-10-05','endDate':'2026-10-09','estimatedHours':8})
+    scope_plan=a.call(f'/projects/{scope_p}/solve','POST',{'strategy':'BALANCED'})
+    a.call(f'/projects/{gap_project}/tasks','POST',{'name':'他项目新任务','startDate':'2026-10-05','endDate':'2026-10-09','estimatedHours':8})
+    a.call(f'/resource-plans/{scope_plan}/confirm','POST')
+    assert a.call(f'/resource-plans/{scope_plan}')['status']=='CONFIRMED'
+    a.call(f'/resource-plans/{scope_plan}/cancel','POST')
+    # CSV 导出：BOM + 表头 + 内容 / CSV exports with BOM and headers
+    s,body=a.raw('/export/supply-demand?weeks=12&model=flat')
+    assert s==200 and body[:3]==bytes([0xEF,0xBB,0xBF]) and '技能' in body.decode('utf-8') and '缺口人数' in body.decode('utf-8')
+    s,body=a.raw('/export/supply-demand?weeks=8&model=weekly')
+    assert s==200 and '供给工时' in body.decode('utf-8')
+    a.call('/export/supply-demand?weeks=8&model=bogus',status=400)
+    s,body=a.raw('/export/timeline')
+    assert s==200 and '成员' in body.decode('utf-8')
+    s,body=a.raw('/system/export/ai-log')
+    assert s==200 and '模型' in body.decode('utf-8')
+    print('PASS: project-scoped freshness hash (cross-project task creation spares drafts) and CSV exports (BOM + zh headers)')
     notify=a.call('/system/notify/status')
     assert notify['mode']=='off' and isinstance(a.call('/system/notify/log'),list),notify
     # Phase 6: capability decisions / 组织能力决策

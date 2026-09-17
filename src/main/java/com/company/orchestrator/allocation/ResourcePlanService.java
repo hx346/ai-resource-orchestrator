@@ -213,9 +213,9 @@ public class ResourcePlanService {
         repository.lockForConfirmation();
         var plan=get(id);
         if("CONFIRMED".equals(plan.get("status"))) return;
-        requireDraft(plan); requireFresh(plan,repository.hash());
-        if(!"[]".equals(plan.get("gaps").toString())) bad("方案仍有未分配任务，不能确认");
         long projectId=((Number)plan.get("project_id")).longValue();
+        requireDraft(plan); requireFresh(plan,repository.hash(projectId));
+        if(!"[]".equals(plan.get("gaps").toString())) bad("方案仍有未分配任务，不能确认");
         // 重规划换班：确认新方案时原子归档本项目旧生效分配与方案 / atomic swap: archive the previous active set while confirming a replacement
         db.update("update resource_allocation set status='CANCELLED',updated_at=now() where project_id=? and status in ('CONFIRMED','PLANNED') and plan_id<>?",projectId,id);
         db.update("update resource_plan set status='ARCHIVED',updated_at=now() where project_id=? and status='CONFIRMED' and id<>?",projectId,id);
