@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Changed
+- CI 自动触发已关闭（push 到 main/dev、所有 PR 不再运行）；工作流保留，改为仅手动触发（`workflow_dispatch`）/ CI auto-triggers disabled; workflow kept as manual-only (`workflow_dispatch`).
+
 ### Fixed
 - Unsupported HTTP methods now return 405 `E40500` (`error.method.not.allowed`, bilingual) with an `Allow` header instead of a 500 `E50000` — companion to the 0.7.0 route-404 fix.
 

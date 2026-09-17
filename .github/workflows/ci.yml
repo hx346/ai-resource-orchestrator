@@ -2,10 +2,9 @@
 # 后端测试为纯 JUnit（无 Spring 上下文、无数据库依赖），可直接跑；前端 build 内含 vue-tsc 类型检查。
 name: CI
 
+# 已关闭自动触发，仅支持手动运行 / automatic triggers disabled; manual runs only
 on:
-  push:
-    branches: [main, dev]
-  pull_request:
+  workflow_dispatch:
 
 jobs:
   backend:
