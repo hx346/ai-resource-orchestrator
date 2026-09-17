@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+### Added
+- GitHub as a fourth sync source (`SYNC_GITHUB_ENABLED` / `SYNC_GITHUB_BASE_URL` / `SYNC_GITHUB_TOKEN`): `/user/repos` lists owned repositories (externalId = `owner/repo`), the issues endpoint is paged at 100 with pull requests (items carrying a `pull_request` field) filtered out, `closed` maps to DONE and issues default to 8h / priority 3. Backed by Flyway `V7` widening the `integration_link.source` check to admit GITHUB; local contract coverage extends `scripts/sync_fixture.py` + `scripts/check_sync_contract.py`.
+
 ## [0.9.0] - 2026-09-17
 ### Added
 - CSV exports for management reporting: `GET /api/v1/export/supply-demand` (flat one-row-per-skill summary or weekly one-row-per-skill-week detail), `GET /api/v1/export/timeline` (active bookings) and `GET /api/v1/system/export/ai-log` (AI audit trail, admin-gated) — UTF-8 BOM + RFC4180 quoting for direct Excel use, with export buttons on the capability / timeline / settings tabs.

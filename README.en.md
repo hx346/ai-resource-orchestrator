@@ -569,13 +569,14 @@ NOTIFY_WEBHOOK_URL=https://... # group-bot webhook (query tokens masked in logs)
 - Every attempt is recorded in `notification_log` (type/status/duration/masked target), visible on the settings page
 - Contract test: `scripts/notify_fixture.py` (local webhook stub) + `scripts/check_notify_contract.py`, same pattern as the LLM contract test
 
-## External Project Sync (Jira / ZenTao / GitLab)
+## External Project Sync (Jira / ZenTao / GitLab / GitHub)
 
 Phase 5 remainder: **one-way import**. Remote projects and issues land as a PLANNING ARO project; tasks get a default sequential workday schedule with status / priority / hours normalized into ARO terms (Jira statusCategory → TODO/IN_PROGRESS/DONE, estimates in seconds → hours). **Skill requirements are not imported** — the integration moves facts only; goals and constraints stay human-authored. `integration_link` maps internal and external objects; incremental refresh (added / updated / cancelled) is allowed while the project has no active allocation set and refused otherwise.
 
 ```text
 SYNC_JIRA_ENABLED=false|true     SYNC_JIRA_BASE_URL=…  SYNC_JIRA_USERNAME=…  SYNC_JIRA_API_TOKEN=…
 SYNC_GITLAB_ENABLED=false|true   SYNC_GITLAB_BASE_URL=…  SYNC_GITLAB_TOKEN=…
+SYNC_GITHUB_ENABLED=false|true   SYNC_GITHUB_BASE_URL=https://api.github.com  SYNC_GITHUB_TOKEN=ghp_…
 SYNC_ZENTAO_ENABLED=false|true   SYNC_ZENTAO_BASE_URL=…  SYNC_ZENTAO_TOKEN=…
 # Override when your ZenTao version differs (defaults /api.php/v1/projects, /api.php/v1/projects/{id}/tasks)
 SYNC_ZENTAO_PATH_PROJECTS=…      SYNC_ZENTAO_PATH_TASKS=…
@@ -1273,7 +1274,7 @@ Once this loop runs end to end, the MVP is a success.
 - **Phase 2 — Richer resource management**: multi-project orchestration, resource timeline, capacity heatmap, cross-project conflicts, plan comparison, capability gap analysis (in progress: skill-level gap analysis and the weekly capacity timeline are shipped)
 - **Phase 3 — Automated skill profiles**: resume parsing, project history parsing, historical task analysis, AI skill profile, automatic skill updates (shipped: text/file draft extraction + normalization with similarity hints + history-evidence adoption + pgvector vector semantic search, optional)
 - **Phase 4 — Dynamic replanning**: automatically re-solve on delays / leave / requirement changes / priority changes / new hires (Event → Impact Analysis → Solver → New Plan → AI explanation → Human confirmation) (shipped: impact analysis + replan solving + atomic swap + org-wide patrol alerts + diff explanations + event-driven triggers (detect/auto, drafts still need human confirmation) + REPLAN_SUGGESTED push)
-- **Phase 5 — Enterprise integrations**: Jira, ZenTao, GitLab, GitHub, Feishu, DingTalk, WeCom, HR systems, ERP, MES (shipped: Feishu / DingTalk / WeCom / generic outbound webhook notifications + one-way Jira / ZenTao / GitLab project import with incremental refresh; GitHub / HR / ERP / MES come later)
+- **Phase 5 — Enterprise integrations**: Jira, ZenTao, GitLab, GitHub, Feishu, DingTalk, WeCom, HR systems, ERP, MES (shipped: Feishu / DingTalk / WeCom / generic outbound webhook notifications + one-way Jira / ZenTao / GitLab / GitHub project import with incremental refresh — GitHub issues default to 8h with pull requests filtered out; HR / ERP / MES come later)
 - **Phase 6 — Organizational capability decisions**: skill supply/demand gap forecasting based on the future project pipeline, with hiring / training / outsourcing / transfer suggestions — evolving into an enterprise resource intelligence platform (shipped: gap forecast (flat and weekly-refined models) + key people + leave impact + pipeline scenarios + gap trends + AI advice + imported external market benchmarks; direct market-data connectors are future work)
 
 ### Long-term Direction

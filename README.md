@@ -563,13 +563,14 @@ NOTIFY_WEBHOOK_URL=https://... # 群机器人 webhook（日志中脱敏 query �
 - 记录：所有发送尝试写入 `notification_log`（类型 / 状态 / 耗时 / 脱敏地址），设置页「集成通知」可查看
 - 契约测试：`scripts/notify_fixture.py`（本地 webhook 桩）+ `scripts/check_notify_contract.py`，与 LLM 契约测试同模式
 
-## 外部项目同步（Jira / 禅道 / GitLab）
+## 外部项目同步（Jira / 禅道 / GitLab / GitHub）
 
 Phase 5 余项：**单向导入**。拉取外部项目与任务，落地为待规划（PLANNING）的 ARO 项目；任务按工时排默认顺序工作日排期，状态 / 优先级 / 工时归一为 ARO 口径（如 Jira statusCategory → TODO/IN_PROGRESS/DONE、估时秒转小时）。**技能需求不随导入生成**——集成只搬运事实，目标与约束由人维护。`integration_link` 表维护内外映射；项目无生效分配时可执行增量刷新（新增 / 更新 / 远端已删则取消），有生效分配时拒绝以保护已确认方案。
 
 ```text
 SYNC_JIRA_ENABLED=false|true     SYNC_JIRA_BASE_URL=…  SYNC_JIRA_USERNAME=…  SYNC_JIRA_API_TOKEN=…
 SYNC_GITLAB_ENABLED=false|true   SYNC_GITLAB_BASE_URL=…  SYNC_GITLAB_TOKEN=…
+SYNC_GITHUB_ENABLED=false|true   SYNC_GITHUB_BASE_URL=https://api.github.com  SYNC_GITHUB_TOKEN=ghp_…
 SYNC_ZENTAO_ENABLED=false|true   SYNC_ZENTAO_BASE_URL=…  SYNC_ZENTAO_TOKEN=…
 # 禅道不同版本路径有差异时覆盖（默认 /api.php/v1/projects 与 /api.php/v1/projects/{id}/tasks）
 SYNC_ZENTAO_PATH_PROJECTS=…      SYNC_ZENTAO_PATH_TASKS=…
@@ -1266,7 +1267,7 @@ AI 解释方案
 - **Phase 2 — 增强项目资源管理**：多项目编排、资源 Timeline、Capacity Heatmap、项目资源冲突、多方案对比、能力 Gap 分析（进行中：技能级缺口分析与周度排期热力图已落地）
 - **Phase 3 — 自动能力画像**：简历解析、项目经历解析、历史任务分析、AI Skill Profile、技能自动更新（已落地：文本/文件识别草稿 + 归一化与相似度建议 + 历史证据采纳 + pgvector 向量语义检索（可选能力））
 - **Phase 4 — 动态重规划**：项目延期 / 人员请假 / 需求变化 / 优先级变化 / 新人加入时自动触发重新求解（Event → Impact Analysis → Solver → New Plan → AI 解释 → 人工确认）（已落地：影响分析 + 重规划求解 + 原子换班 + 全局巡检提醒 + 差异解释 + 事件自动触发（detect/auto 两档，草稿仍须人工确认）+ REPLAN_SUGGESTED 推送）
-- **Phase 5 — 企业系统集成**：Jira、禅道、GitLab、GitHub、飞书、钉钉、企业微信、HR 系统、ERP、MES（已落地：飞书 / 钉钉 / 企业微信 / 通用 webhook 出站通知 + Jira / 禅道 / GitLab 项目单向导入与增量刷新；GitHub / HR / ERP / MES 待后续）
+- **Phase 5 — 企业系统集成**：Jira、禅道、GitLab、GitHub、飞书、钉钉、企业微信、HR 系统、ERP、MES（已落地：飞书 / 钉钉 / 企业微信 / 通用 webhook 出站通知 + Jira / 禅道 / GitLab / GitHub 项目单向导入与增量刷新；GitHub 默认 8h 工时、PR 自动过滤；HR / ERP / MES 待后续）
 - **Phase 6 — 组织能力决策**：基于未来项目 Pipeline 做 Skill 供需 Gap 预测，输出招聘 / 培训 / 外包 / 调岗建议，演进为企业能力资源决策平台（已落地：Gap 预测（平铺 / 按周精化双口径）+ 关键能力节点 + 离开影响 + Pipeline 情景模拟 + 缺口趋势 + AI 建议 + 外部市场参考数据导入；后续可演进市场数据源直连）
 
 ### 长期方向
