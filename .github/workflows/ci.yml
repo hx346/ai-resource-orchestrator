@@ -1,0 +1,41 @@
+# 最小质量门禁 / minimal quality gate: backend unit tests + frontend typecheck & build
+# 后端测试为纯 JUnit（无 Spring 上下文、无数据库依赖），可直接跑；前端 build 内含 vue-tsc 类型检查。
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+      - name: Backend unit tests
+        run: ./mvnw -B --no-transfer-progress test
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - name: Frontend typecheck and build
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build
