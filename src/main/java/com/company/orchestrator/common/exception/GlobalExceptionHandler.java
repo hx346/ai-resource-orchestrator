@@ -6,8 +6,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -50,6 +52,17 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(NoResourceFoundException.class)
     public ResponseEntity<Result<Void>> handleNoResource(NoResourceFoundException e) {
         return notFound(resolve(ErrorCode.NOT_FOUND, new Object[] {e.getMessage()}));
+    }
+
+    /** 方法不匹配：405 + Allow 头 / wrong verb: 405 with Allow header. */
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<Result<Void>> handleMethodNotSupported(HttpRequestMethodNotSupportedException e) {
+        log.warn("method not allowed: {}", e.getMessage());
+        ResponseEntity.BodyBuilder builder = ResponseEntity.status(ErrorCode.METHOD_NOT_ALLOWED.httpStatus());
+        if (e.getSupportedHttpMethods() != null)
+            builder = builder.allow(e.getSupportedHttpMethods().toArray(HttpMethod[]::new));
+        return builder.body(Result.fail(ErrorCode.METHOD_NOT_ALLOWED.code(),
+                resolve(ErrorCode.METHOD_NOT_ALLOWED, new Object[] {e.getMethod()})));
     }
 
     @ExceptionHandler(DuplicateKeyException.class)
