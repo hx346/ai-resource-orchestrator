@@ -1043,6 +1043,16 @@ POST /api/v1/projects/{id}/status    # 项目生命周期流转（终态须无�
 POST /api/v1/employees/{id}/status   # 员工停用 / 休假 / 回归（触发重规划巡检）
 ```
 
+### 导出 API
+
+```text
+GET  /api/v1/export/supply-demand?weeks=12&model=flat|weekly  # 技能供需缺口 CSV（flat 汇总 / weekly 逐周）
+GET  /api/v1/export/timeline                                  # 资源排期（生效占用明细）CSV
+GET  /api/v1/system/export/ai-log                             # AI 调用审计 CSV（仅管理员）
+```
+
+UTF-8 BOM + RFC4180 转义，Excel 可直接打开中文；前端能力决策 / 资源排期 / 设置页各有一键导出。
+
 ### 技能识别 API
 
 ```text

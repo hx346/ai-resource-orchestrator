@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2026-09-17
+### Added
+- CSV exports for management reporting: `GET /api/v1/export/supply-demand` (flat one-row-per-skill summary or weekly one-row-per-skill-week detail), `GET /api/v1/export/timeline` (active bookings) and `GET /api/v1/system/export/ai-log` (AI audit trail, admin-gated) — UTF-8 BOM + RFC4180 quoting for direct Excel use, with export buttons on the capability / timeline / settings tabs.
+- `input_hash` is now project-scoped: the four project tables hash only this project's rows while people / skills / global bookings stay whole, so creating tasks in one project no longer invalidates drafts of another (people, availability and cross-project booking changes still do, by design).
+
 ## [0.8.0] - 2026-09-16
 ### Added
 - Execution-side lifecycle closes the business loop with guarded status transitions: `POST /api/v1/tasks/{id}/status` (TODO → IN_PROGRESS → DONE / CANCELLED, DONE/CANCELLED terminal; completing or cancelling a task closes its active bookings — allocation status `COMPLETED` / `CANCELLED` — so capacity is released at once across solving, timeline, capability forecasts and cross-project warnings; parents cannot close while children stay open), `POST /api/v1/projects/{id}/status` (PLANNING → IN_PROGRESS → ON_HOLD / COMPLETED / CANCELLED; terminal transitions require no active bookings, completion requires every task closed, terminal projects can no longer be solved) and `POST /api/v1/employees/{id}/status` (ACTIVE ⇄ ON_LEAVE / INACTIVE, INACTIVE only returns to ACTIVE; deactivation drops the employee from candidacy immediately and triggers the replan patrol on booked projects). New webhook events `PLAN_CANCELLED` and `PROJECT_COMPLETED`; the UI gains a task status column with start/complete/cancel actions plus project and employee status pickers.

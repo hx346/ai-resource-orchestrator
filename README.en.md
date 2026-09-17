@@ -1050,6 +1050,16 @@ POST /api/v1/projects/{id}/status    # project lifecycle (terminal states need n
 POST /api/v1/employees/{id}/status   # employee offboarding / leave / return (triggers the patrol)
 ```
 
+### Export API
+
+```text
+GET  /api/v1/export/supply-demand?weeks=12&model=flat|weekly  # supply-demand gaps CSV (flat summary / per-week)
+GET  /api/v1/export/timeline                                  # active bookings CSV
+GET  /api/v1/system/export/ai-log                             # AI audit trail CSV (admin only)
+```
+
+UTF-8 BOM plus RFC4180 quoting so Excel opens Chinese correctly; one-click export buttons live on the capability, timeline and settings tabs.
+
 ### Skill Recognition API
 
 ```text
