@@ -177,6 +177,7 @@ def main():
     a.call('/skills/semantic/rebuild','POST',status=400)
     assert isinstance(a.call('/replan/triggers'),list)
     a.call('/sync/jira/projects',status=400)
+    a.call('/sync/github/projects',status=400)
     a.call('/sync/bogus/projects',status=400)
     print('PASS: optional capabilities stay guarded when disabled (semantic search, external sync)')
     timeline=a.call('/allocations/timeline')

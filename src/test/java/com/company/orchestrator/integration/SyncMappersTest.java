@@ -66,4 +66,11 @@ class SyncMappersTest {
         assertEquals(LocalDate.of(2026, 10, 16), end);   // 05–09 五个工作日 + 一周缓冲
         assertEquals(LocalDate.of(2028, 10, 5), SyncMappers.windowEnd(LocalDate.of(2026, 10, 5), List.of(2000, 2000, 2000)));
     }
+    
+    @Test
+    void githubStatusMapsClosedToDone() {
+        assertEquals("DONE", SyncMappers.githubStatus("closed"));
+        assertEquals("TODO", SyncMappers.githubStatus("open"));
+        assertEquals("TODO", SyncMappers.githubStatus(null));
+    }
 }

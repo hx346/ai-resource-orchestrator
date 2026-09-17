@@ -79,6 +79,16 @@ def main():
     assert gl_tasks['Nightly rebuild']['status'] == 'DONE', gl_tasks
     print('PASS: gitlab import with closed-issue normalization')
 
+    # ---- GitHub：PR 过滤 + closed→DONE / pull requests filtered, closed normalized ----
+    gh_projects = call('/sync/github/projects')
+    gh_repo = next(p for p in gh_projects if p['externalId'] == 'acme/ml-platform')
+    gh = call('/sync/github/import', 'POST', {'externalId': gh_repo['externalId']})
+    assert gh['tasksImported'] == 2 and gh['doneTasks'] == 1, gh
+    gh_tasks = {t['name']: t for t in call(f"/projects/{gh['projectId']}/tasks")}
+    assert len(gh_tasks) == 2 and 'Update README (PR)' not in gh_tasks, gh_tasks
+    assert gh_tasks['Deploy inference service']['status'] == 'DONE', gh_tasks
+    print('PASS: github import filters pull requests and normalizes closed to DONE')
+
     # ---- 禅道：列 + 导入（pri/estimate 映射）----
     zt_projects = call('/sync/zentao/projects')
     mes = next(p for p in zt_projects if p['externalId'] == '55')

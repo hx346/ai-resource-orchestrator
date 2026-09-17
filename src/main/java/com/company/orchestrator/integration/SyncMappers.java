@@ -36,6 +36,9 @@ public final class SyncMappers {
     /** GitLab issue state → ARO 状态 / GitLab issue state. */
     public static String gitlabStatus(String state) { return "closed".equals(state) ? "DONE" : "TODO"; }
 
+    /** GitHub issue state → ARO 状态 / GitHub issue state. */
+    public static String githubStatus(String state) { return "closed".equals(state) ? "DONE" : "TODO"; }
+
     /** 优先级钳到 1–5 / clamp priority into 1..5. */
     public static int priority(Integer value) {
         return value == null ? 3 : Math.max(1, Math.min(5, value));

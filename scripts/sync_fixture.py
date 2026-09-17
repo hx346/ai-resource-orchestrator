@@ -15,6 +15,7 @@ from urllib.parse import urlparse, parse_qs
 
 JIRA_TOKEN = "demo-token"
 GITLAB_TOKEN = "glpat-demo"
+GITHUB_TOKEN = "ghp-demo"
 ZENTAO_TOKEN = "zt-demo-token"
 
 # 固定数据：一个 Jira 项目（含已完成 / 进行中 issue）、一个 GitLab 项目、一个禅道项目
@@ -36,6 +37,13 @@ GITLAB_PROJECTS = [{"id": 77, "path": "data-pipeline", "name": "Data Pipeline", 
 GITLAB_ISSUES = [
     {"iid": 11, "title": "Ingest CDC stream", "state": "opened", "weight": 2, "web_url": "http://fixture/issues/11"},
     {"iid": 12, "title": "Nightly rebuild", "state": "closed", "weight": 3, "web_url": "http://fixture/issues/12"},
+]
+# GitHub：1 仓库 3 issue，其中 1 条是 PR（含 pull_request 字段）/ one repo, one item is a PR
+GITHUB_REPOS = [{"id": 901, "name": "ml-platform", "full_name": "acme/ml-platform", "archived": False, "html_url": "http://fixture/ml-platform"}]
+GITHUB_ISSUES = [
+    {"number": 31, "title": "Train defect model", "state": "open", "html_url": "http://fixture/issues/31"},
+    {"number": 32, "title": "Deploy inference service", "state": "closed", "html_url": "http://fixture/issues/32"},
+    {"number": 33, "title": "Update README (PR)", "state": "open", "pull_request": {"url": "http://fixture/prs/33"}, "html_url": "http://fixture/prs/33"},
 ]
 ZENTAO_PROJECTS = [{"id": 55, "code": "MES", "name": "MES 对接", "status": "doing"}]
 ZENTAO_TASKS = [
@@ -61,6 +69,8 @@ class Handler(BaseHTTPRequestHandler):
             return header in (basic, f"Bearer {JIRA_TOKEN}")
         if kind == "gitlab":
             return self.headers.get("PRIVATE-TOKEN") == GITLAB_TOKEN
+        if kind == "github":
+            return self.headers.get("Authorization") == "Bearer " + GITHUB_TOKEN
         return self.headers.get("Token") == ZENTAO_TOKEN
 
     def do_GET(self):
@@ -94,6 +104,13 @@ class Handler(BaseHTTPRequestHandler):
             pid = parsed.path.rsplit("/", 1)[1]
             project = next((p for p in GITLAB_PROJECTS if str(p["id"]) == pid), None)
             return self._send(project, 200) if self._authorized("gitlab") and project else self._send({"message": "404"}, 404)
+        # ---- GitHub REST v3 ----
+        if parsed.path == "/user/repos":
+            return self._send(GITHUB_REPOS if self._authorized("github") else [], 200 if self._authorized("github") else 401)
+        if parsed.path == "/repos/acme/ml-platform":
+            return self._send(GITHUB_REPOS[0] if self._authorized("github") else {}, 200 if self._authorized("github") else 401)
+        if parsed.path == "/repos/acme/ml-platform/issues":
+            return self._send(GITHUB_ISSUES if self._authorized("github") else [], 200 if self._authorized("github") else 401)
         # ---- 禅道 OpenAPI v1 ----
         if parsed.path == "/api.php/v1/projects":
             return self._send({"projects": ZENTAO_PROJECTS}, 200 if self._authorized("zentao") else 401)

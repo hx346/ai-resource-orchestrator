@@ -105,5 +105,9 @@ app:
       enabled: ${SYNC_ZENTAO_ENABLED:false}
       base-url: ${SYNC_ZENTAO_BASE_URL:}
       token: ${SYNC_ZENTAO_TOKEN:}
+    github:
+      enabled: ${SYNC_GITHUB_ENABLED:false}
+      base-url: ${SYNC_GITHUB_BASE_URL:https://api.github.com}
+      token: ${SYNC_GITHUB_TOKEN:}
       path-projects: ${SYNC_ZENTAO_PATH_PROJECTS:/api.php/v1/projects}
       path-tasks: ${SYNC_ZENTAO_PATH_TASKS:/api.php/v1/projects/{id}/tasks}
