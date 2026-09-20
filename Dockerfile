@@ -2,7 +2,8 @@
 # ---- Frontend build ----
 FROM node:22-alpine AS web
 WORKDIR /web
-RUN corepack enable && corepack prepare pnpm@11.20.0 --activate
+RUN corepack enable
+# pnpm 版本由 web/package.json 的 packageManager 字段钉住（与 CI 一致）/ pnpm pinned by the packageManager field, matching CI
 COPY web/package.json web/pnpm-lock.yaml web/pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 COPY web/ ./

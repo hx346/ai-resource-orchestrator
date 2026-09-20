@@ -107,10 +107,21 @@ public class ProjectService {
         if (Project.STATUS_COMPLETED.equals(status)) notify.projectCompleted(id);
     }
 
-    /** 删除项目（级联删除里程碑与任务）/ Delete project with milestones and tasks. */
+    /**
+     * 删除项目（级联删除里程碑与任务）。已产生方案/分配的项目不可删，请改走状态流转；
+     * 同步映射（integration_link）随项目一并清理，避免孤儿 link 永久阻断再次导入。
+     * Delete cascades milestones and tasks; projects with plans/allocations must use
+     * status transitions instead. Sync links are cleared with the project so the
+     * external source can be re-imported later.
+     */
     @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
         requireExists(id);
+        if (db.queryForObject("select count(*) from resource_plan where project_id=?", Long.class, id) > 0
+                || db.queryForObject("select count(*) from resource_allocation where project_id=?", Long.class, id) > 0)
+            throw new BusinessException(ErrorCode.BAD_REQUEST,"项目已有资源方案或分配记录，不可删除；请改为取消或完结项目");
+        db.update("delete from integration_link where (external_type='PROJECT' and internal_id=?)"
+                + " or (external_type='TASK' and internal_id in (select id from task where project_id=?))", id, id);
         milestoneMapper.delete(new LambdaQueryWrapper<ProjectMilestone>()
                 .eq(ProjectMilestone::getProjectId, id));
         taskMapper.delete(new LambdaQueryWrapper<Task>()

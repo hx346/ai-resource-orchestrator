@@ -8,7 +8,9 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import com.company.orchestrator.common.exception.*;
+import lombok.extern.slf4j.Slf4j;
 /** Pure LLM adapter: no persistence or business decisions. No implicit simulated output. */
+@Slf4j
 @Component
 public class AiClient {
     private final ObjectProvider<ChatModel> models;
@@ -31,9 +33,10 @@ public class AiClient {
             } finally { slots.release(); }
         });
         try { return future.get(75,TimeUnit.SECONDS); }
-        catch(TimeoutException ex) { future.cancel(true); throw new BusinessException(ErrorCode.AI_TIMEOUT); }
+        catch(TimeoutException ex) { future.cancel(true); log.warn("ai call timed out after 75s"); throw new BusinessException(ErrorCode.AI_TIMEOUT); }
         catch(InterruptedException ex) { future.cancel(true); Thread.currentThread().interrupt(); throw new BusinessException(ErrorCode.AI_CANCELLED); }
-        catch(ExecutionException ex) { throw new BusinessException(ErrorCode.AI_UPSTREAM_FAILED); }
+        // 上游失败必须留根因日志，否则 live 模式排障失明 / log the cause, AI_UPSTREAM_FAILED alone is undebuggable
+        catch(ExecutionException ex) { log.error("ai upstream call failed",ex.getCause()); throw new BusinessException(ErrorCode.AI_UPSTREAM_FAILED); }
         finally { executor.shutdownNow(); }
     }
 }

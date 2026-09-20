@@ -60,6 +60,11 @@ spring:
 
 server:
   port: 8080
+  servlet:
+    session:
+      cookie:
+        # 同源会话加固 / same-origin session hardening
+        same-site: lax
 
 management:
   endpoints:
@@ -74,6 +79,14 @@ logging:
 app:
   admin-password: ${ADMIN_PASSWORD:}
   ai-mode: ${AI_MODE:off}
+  # 登录限速（内存滑动窗口，0 = 不限速）/ login throttling; 0 disables
+  auth:
+    login-max-failures: ${LOGIN_MAX_FAILURES:5}
+    login-lock-minutes: ${LOGIN_LOCK_MINUTES:15}
+  # AI 审计保留：超期每日清理，0 = 永久保留 / audit retention purge; 0 keeps everything
+  ai-audit:
+    retention-days: ${AI_AUDIT_RETENTION_DAYS:90}
+    purge-cron: "0 30 3 * * *"
   # 出站通知：off 关闭；live 需要 NOTIFY_WEBHOOK_URL / outbound webhook notifications
   notify:
     mode: ${NOTIFY_MODE:off}
@@ -105,9 +118,10 @@ app:
       enabled: ${SYNC_ZENTAO_ENABLED:false}
       base-url: ${SYNC_ZENTAO_BASE_URL:}
       token: ${SYNC_ZENTAO_TOKEN:}
+      # 不同版本禅道路径差异时覆盖 / override for ZenTao deployments with custom API paths
+      path-projects: ${SYNC_ZENTAO_PATH_PROJECTS:/api.php/v1/projects}
+      path-tasks: ${SYNC_ZENTAO_PATH_TASKS:/api.php/v1/projects/{id}/tasks}
     github:
       enabled: ${SYNC_GITHUB_ENABLED:false}
       base-url: ${SYNC_GITHUB_BASE_URL:https://api.github.com}
       token: ${SYNC_GITHUB_TOKEN:}
-      path-projects: ${SYNC_ZENTAO_PATH_PROJECTS:/api.php/v1/projects}
-      path-tasks: ${SYNC_ZENTAO_PATH_TASKS:/api.php/v1/projects/{id}/tasks}

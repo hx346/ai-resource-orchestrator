@@ -90,8 +90,11 @@ public class ExportService {
     }
 
     static String escape(String value) {
-        if (value.contains(",") || value.contains("\"") || value.contains("\n") || value.contains("\r"))
-            return "\"" + value.replace("\"", "\"\"") + "\"";
-        return value;
+        // 公式注入防护：以 = + - @ 或制表符开头的单元格前置单引号，Excel 打开不再当公式执行
+        // Neutralize CSV formula injection: quote-leading cells starting with = + - @ or a tab.
+        String guarded = value.isEmpty() || "=+-@\t".indexOf(value.charAt(0)) < 0 ? value : "'" + value;
+        if (guarded.contains(",") || guarded.contains("\"") || guarded.contains("\n") || guarded.contains("\r"))
+            return "\"" + guarded.replace("\"", "\"\"") + "\"";
+        return guarded;
     }
 }

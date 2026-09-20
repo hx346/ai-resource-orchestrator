@@ -26,4 +26,16 @@ class ExportCsvTest {
         assertTrue(text.contains("\r\n"));                // RFC4180 行尾
         assertTrue(text.contains("\"招聘,培训\""));         // 含逗号字段加引号
     }
+
+    @Test
+    void neutralizesFormulaInjection() {
+        // 以 = + - @ 开头的单元格前置单引号，Excel 打开不再当公式执行
+        // Leading = + - @ cells get a quote prefix so Excel cannot execute them
+        assertEquals("'=1+1", ExportService.escape("=1+1"));
+        assertEquals("'+SUM(A1)", ExportService.escape("+SUM(A1)"));
+        assertEquals("'-2+3", ExportService.escape("-2+3"));
+        assertEquals("'@x", ExportService.escape("@x"));
+        assertEquals("\"'=1,2\"", ExportService.escape("=1,2")); // 防护后再走 RFC4180 引号 / guard applies before quoting
+        assertEquals("plain", ExportService.escape("plain"));
+    }
 }

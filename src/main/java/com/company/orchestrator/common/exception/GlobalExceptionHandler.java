@@ -45,8 +45,10 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler({HttpMessageNotReadableException.class, MethodArgumentTypeMismatchException.class})
     public ResponseEntity<Result<Void>> handleUnreadable(Exception e) {
+        // 解析错误原文（类名/JSON 片段）只进日志，不回传客户端 / details stay in logs, not in the response
         log.warn("request body / param error: {}", e.getMessage());
-        return badRequest(resolve(ErrorCode.BAD_REQUEST, new Object[] {e.getMessage()}));
+        return badRequest(messageSource.getMessage("error.request.unreadable", null,
+                "error.request.unreadable", LocaleContextHolder.getLocale()));
     }
 
     @ExceptionHandler(NoResourceFoundException.class)

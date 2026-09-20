@@ -65,4 +65,16 @@ class DocumentTextExtractorTest {
     void brokenInputFailsWithTypedMessage() {
         assertThrows(IllegalArgumentException.class, () -> DocumentTextExtractor.extract("resume.pdf", "not a pdf".getBytes(StandardCharsets.UTF_8)));
     }
+
+    @Test
+    void docxBeyondDecompressionCapIsRejected() throws IOException {
+        // zip 炸弹：压缩后极小，解压超 1MB 上限须在读满前终止 / zip bomb must trip the 1MB cap mid-read
+        var out = new ByteArrayOutputStream();
+        try (var zip = new ZipOutputStream(out)) {
+            zip.putNextEntry(new ZipEntry("word/document.xml"));
+            for (int i = 0; i < 210; i++) zip.write(new byte[8192]); // 210×8KB ≈ 1.7MB
+            zip.closeEntry();
+        }
+        assertThrows(IllegalArgumentException.class, () -> DocumentTextExtractor.extract("bomb.docx", out.toByteArray()));
+    }
 }

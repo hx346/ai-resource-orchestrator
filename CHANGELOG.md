@@ -5,12 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.11.0] - 2026-09-20
 ### Changed
 - CI 自动触发已关闭（push 到 main/dev、所有 PR 不再运行）；工作流保留，改为仅手动触发（`workflow_dispatch`）/ CI auto-triggers disabled; workflow kept as manual-only (`workflow_dispatch`).
+- `resource_plan.gaps` 迁移为 jsonb，删除从未写入的 `score` 死列，`resource_plan_item` 增加 `(plan_id, task_id)` 唯一索引（`V10` 先去重保最低 id 再建）/ gaps moved to jsonb, the never-written score column dropped, and plan items carry a unique fallback index.
+- 外部同步刷新：本地与远端同为终态（DONE/CANCELLED）的任务保留原排期与记录不再重排（远端重开则照常更新）；远端已删仅取消本地未完结任务；任务映射加载收敛到本项目 / refresh freezes tasks closed on both sides, only cancels locally open tasks on remote delete, and scopes the task-map query to the project.
+- 版本对齐：pom `0.1.0-SNAPSHOT` → `0.11.0-SNAPSHOT`，与 CHANGELOG 同步；发布时在 main 上打 `v0.X.Y` tag / pom version aligned with the changelog; cut `v0.X.Y` tags on main at release time.
+
+### Added
+- AI 审计保留策略：`ai_execution` 超期每日 03:30 清理（`AI_AUDIT_RETENTION_DAYS` 默认 90 天，0 = 永久；cron 经 `app.ai-audit.purge-cron` 可配）/ scheduled audit retention purge.
+- 登录失败限速：内存滑动窗口按「用户名|IP」（`LOGIN_MAX_FAILURES` 默认 5、`LOGIN_LOCK_MINUTES` 默认 15，0 = 关闭），锁定期间返回 429 `auth.login.locked` 双语文案 / in-memory login throttling with a bilingual 429.
+- 资源排期超过 500 位在职成员时返回 `truncated` 标记，前端显示截断提示（CSV 同口径）/ timeline reports and surfaces truncation beyond 500 employees.
 
 ### Fixed
 - Unsupported HTTP methods now return 405 `E40500` (`error.method.not.allowed`, bilingual) with an `Allow` header instead of a 500 `E50000` — companion to the 0.7.0 route-404 fix.
+- AI 上游调用失败与超时现在记录根因日志（原先 `AI_UPSTREAM_FAILED` 无任何日志，live 模式排障失明）/ upstream AI failures and timeouts now log the root cause.
+- `docker-compose.yml` 补齐 `REPLAN_*` / `SKILL_SEMANTIC_*` / `EMBEDDING_MODEL` / `AI_EMBEDDING_PROVIDER` / `SYNC_*`（Jira/GitLab/GitHub/ZenTao）环境变量透传，此前 compose 部署无法启用这些功能 / compose now passes through the replan, semantic-search and external-sync env vars.
+- `application.yml` 把禅道 `path-projects`/`path-tasks` 从误放的 github 块移回 zentao 块，`SYNC_ZENTAO_PATH_*` 覆盖恢复生效 / ZenTao path-override keys moved back under the zentao block and work again.
+- 删除项目前置检查资源方案/分配并给出业务提示（替代泛化 409），连带清理 `integration_link` 映射；`V9` 一次性清理存量孤儿，同源外部项目可再次导入 / project deletion pre-checks plans/allocations and clears sync links; `V9` purges existing orphans so re-import works.
+- 删除员工前置检查关联账号、负责项目与分配记录 / employee deletion pre-checks account, managed projects and booking references.
+- 外部同步的 HTTP 拉取移出数据库事务，慢远端不再长期占用连接池；刷新的生效分配守卫移入事务内 / sync fetches run outside the write transaction, while the active-allocation guard moved inside it.
+- 周负载预警的 `plan_id` 排除改为 NULL 安全的 `is distinct from`；时间线与预警的“今天”由 Java 统一传入，消除 DB/VM 时区口径差 / NULL-safe plan exclusion and one "today" timezone for timeline and warnings.
+- AI 规划流式前端请求加 180s 兜底超时；登录失败展示服务端双语消息；非 JSON 响应给出可读错误 / AI planning stream gets a 180s timeout; login shows the server message; non-JSON responses fail readably.
+- `Dockerfile` 的 pnpm 版本恢复由 `web/package.json` 的 `packageManager` 字段钉住（原 11.20.0 与 CI/package.json 的 10.28.2 不一致）/ the Docker build now honors the packageManager pin.
+- 出站通知的 afterCommit 回调整体兜底，日志写入失败不再向事务回调抛异常 / the webhook afterCommit callback is fully guarded and can no longer throw.
+
+### Security
+- CSV 导出对以 `=` `+` `-` `@` 或制表符开头的单元格前置单引号，阻断 Excel 公式注入（含外部系统导入的名称）/ CSV exports neutralize Excel formula injection by quote-guarding leading `= + - @` and tab cells, including names imported from external systems.
+- 简历上传 docx 解压加 1MB 上限（流式读取），阻断 zip 炸弹内存耗尽 / docx decompression is streamed with a 1MB cap, blocking zip-bomb memory exhaustion.
+- 会话 Cookie 显式 `SameSite=Lax` / session cookie now sets `SameSite=Lax` explicitly.
+- 请求体解析失败不再把 Jackson 解析错误原文回传客户端 / malformed-request responses no longer echo parser internals.
+
+### Added
+- Flyway `V8` 热路径索引：`employee_skill(skill_id)`、`resource_allocation(task_id)`、生效分配按 `end_date` 的部分索引、`task_skill_requirement(skill_id)` / hot-path indexes for skill analytics, task close-out, active-booking scans and skill patrols.
+- `CandidateServiceTest`：候选容量数学单测（基点单位换算、技能门槛、窗口清零、占用扣减、PREFERRED 评分、周末剔除）/ unit tests for the candidate capacity math.
 
 ## [0.10.0] - 2026-09-17
 ### Added

@@ -107,22 +107,27 @@ public class NotifyService {
     }
 
     private void dispatch(String type, String message, Object data) {
-        String payload = NotifyPayloads.body(provider, type, message, data);
-        long started = System.currentTimeMillis();
-        String error = null;
+        // afterCommit 回调绝不能抛出异常，整体兜底 / the afterCommit callback must never throw
         try {
-            var request = HttpRequest.newBuilder(URI.create(webhookUrl)).timeout(Duration.ofSeconds(10))
-                    .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(payload, StandardCharsets.UTF_8)).build();
-            int status = http.send(request, HttpResponse.BodyHandlers.ofString()).statusCode();
-            if (status < 200 || status >= 300) error = "HTTP " + status;
+            String payload = NotifyPayloads.body(provider, type, message, data);
+            long started = System.currentTimeMillis();
+            String error = null;
+            try {
+                var request = HttpRequest.newBuilder(URI.create(webhookUrl)).timeout(Duration.ofSeconds(10))
+                        .header("Content-Type", "application/json")
+                        .POST(HttpRequest.BodyPublishers.ofString(payload, StandardCharsets.UTF_8)).build();
+                int status = http.send(request, HttpResponse.BodyHandlers.ofString()).statusCode();
+                if (status < 200 || status >= 300) error = "HTTP " + status;
+            } catch (Exception ex) {
+                error = ex.getClass().getSimpleName() + ": " + ex.getMessage();
+                log.warn("notification failed, type={}, provider={}", type, provider, ex);
+            }
+            // 脱敏：webhook 地址 query 常含令牌 / mask tokens in the query string
+            db.update("insert into notification_log(type,provider,target,payload,status,error,duration) values (?,?,?,?,?,?,?)",
+                    type, provider, webhookUrl.replaceAll("\\?.*$", ""), payload, error == null ? "SUCCESS" : "FAILED", error,
+                    (int) (System.currentTimeMillis() - started));
         } catch (Exception ex) {
-            error = ex.getClass().getSimpleName() + ": " + ex.getMessage();
-            log.warn("notification failed, type={}, provider={}", type, provider, ex);
+            log.error("notification dispatch crashed, type={}", type, ex);
         }
-        // 脱敏：webhook 地址 query 常含令牌 / mask tokens in the query string
-        db.update("insert into notification_log(type,provider,target,payload,status,error,duration) values (?,?,?,?,?,?,?)",
-                type, provider, webhookUrl.replaceAll("\\?.*$", ""), payload, error == null ? "SUCCESS" : "FAILED", error,
-                (int) (System.currentTimeMillis() - started));
     }
 }

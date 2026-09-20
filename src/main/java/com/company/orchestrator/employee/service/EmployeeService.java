@@ -32,6 +32,7 @@ public class EmployeeService {
     private final EmployeeAvailabilityMapper availabilityMapper;
     private final DepartmentService departmentService;
     private final com.company.orchestrator.allocation.ReplanTriggerService replan;
+    private final org.springframework.jdbc.core.JdbcTemplate db;
 
     public IPage<Employee> page(long pageNum, long pageSize, String keyword, Long departmentId) {
         LambdaQueryWrapper<Employee> wrapper = new LambdaQueryWrapper<Employee>()
@@ -111,9 +112,15 @@ public class EmployeeService {
         log.info("employee status changed, id={}, {} -> {}", id, from, status);
     }
 
+    /** 删除前检查引用（sys_user / 负责项目 / 分配与方案条目均为 NO ACTION 外键），被引用时给业务提示而非泛化 409 / pre-check references so users see a business error instead of a generic 409. */
     @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
         requireExists(id);
+        if (db.queryForObject("select count(*) from sys_user where employee_id=?", Long.class, id) > 0
+                || db.queryForObject("select count(*) from project where manager_id=?", Long.class, id) > 0
+                || db.queryForObject("select count(*) from resource_allocation where employee_id=?", Long.class, id) > 0
+                || db.queryForObject("select count(*) from resource_plan_item where employee_id=?", Long.class, id) > 0)
+            throw new BusinessException(ErrorCode.BAD_REQUEST,"成员已关联账号、负责项目或存在分配记录，不可删除；请改为停用");
         availabilityMapper.delete(new LambdaQueryWrapper<EmployeeAvailability>()
                 .eq(EmployeeAvailability::getEmployeeId, id));
         employeeMapper.deleteById(id);

@@ -11,7 +11,8 @@ import java.util.stream.Collectors;
 
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import com.company.orchestrator.integration.ExternalProjectClient.ProjectWithTasks;
 import com.company.orchestrator.integration.ExternalProjectClient.RemoteTask;
@@ -22,10 +23,12 @@ import lombok.extern.slf4j.Slf4j;
  * 外部项目单向导入：拉取 → 建项目（PLANNING）→ 任务按默认顺序排期落地 →
  * integration_link 记录映射。无生效分配时可增量刷新（新增 / 更新 / 远端已删则取消）。
  * 集成只搬运事实：技能需求不导入，目标与约束由人维护。
+ * 外部 HTTP 拉取在事务外执行（远端可达 25s），避免长期占用数据库连接。
  * One-way external import: fetch → create a PLANNING project → land tasks on a
  * default sequential schedule → record integration_link rows. Refresh is only
  * allowed while no allocation set is active. Facts only — skill requirements
- * stay human-authored.
+ * stay human-authored. The remote fetch runs OUTSIDE the write transaction so a
+ * slow upstream cannot pin a pooled connection.
  */
 @Slf4j
 @Service
@@ -33,10 +36,12 @@ public class SyncService {
 
     private final JdbcTemplate db;
     private final Map<String, ExternalProjectClient> clients;
+    private final TransactionTemplate tx;
 
-    public SyncService(JdbcTemplate db, List<ExternalProjectClient> list) {
+    public SyncService(JdbcTemplate db, List<ExternalProjectClient> list, PlatformTransactionManager transactionManager) {
         this.db = db;
         this.clients = list.stream().collect(Collectors.toMap(c -> c.source().toLowerCase(), c -> c));
+        this.tx = new TransactionTemplate(transactionManager);
     }
 
     /** 列出外部项目（关键词本地过滤）/ list remote projects filtered by keyword. */
@@ -49,8 +54,7 @@ public class SyncService {
                 .toList();
     }
 
-    /** 导入外部项目 / import a remote project. */
-    @Transactional(rollbackFor = Exception.class)
+    /** 导入外部项目：拉取在事务外，落库在事务内 / import: fetch outside the transaction, persist inside it. */
     public Map<String, Object> importProject(String source, String externalId) {
         var client = client(source);
         if (externalId == null || externalId.isBlank()) bad("缺少外部项目 ID");
@@ -58,6 +62,10 @@ public class SyncService {
                 Long.class, client.source(), externalId);
         if (!existing.isEmpty()) return Map.of("alreadyImported", true, "projectId", existing.getFirst(), "note", "该项目此前已导入，可执行刷新增量同步");
         ProjectWithTasks fetched = client.fetch(externalId);
+        return tx.execute(status -> persistImport(client, fetched, externalId));
+    }
+
+    private Map<String, Object> persistImport(ExternalProjectClient client, ProjectWithTasks fetched, String externalId) {
         LocalDate start = LocalDate.now();
         LocalDate end = SyncMappers.windowEnd(start, fetched.tasks().stream().map(RemoteTask::hours).toList());
         long projectId = db.queryForObject("""
@@ -84,31 +92,41 @@ public class SyncService {
                 "tasksImported", imported, "openTasks", open, "doneTasks", imported - open);
     }
 
-    /** 增量刷新：远端新增入列、变化更新、删除取消本地任务；有生效分配时拒绝。 / incremental refresh, blocked while allocations are active. */
-    @Transactional(rollbackFor = Exception.class)
+    /** 增量刷新：拉取在事务外；生效分配守卫在事务内，避免检查后写入的竞态。 / incremental refresh: fetch outside, guard inside the transaction. */
     public Map<String, Object> refresh(String source, long projectId) {
         var client = client(source);
         var projectLinks = db.queryForList("select external_id from integration_link where source=? and external_type='PROJECT' and internal_id=?",
                 String.class, client.source(), projectId);
         if (projectLinks.isEmpty()) bad("该项目不是从 " + client.source() + " 导入的项目");
+        ProjectWithTasks fetched = client.fetch(projectLinks.getFirst());
+        return tx.execute(status -> persistRefresh(client, projectId, fetched));
+    }
+
+    private Map<String, Object> persistRefresh(ExternalProjectClient client, long projectId, ProjectWithTasks fetched) {
         if (db.queryForObject("select count(*) from resource_allocation where project_id=? and status in ('PLANNED','CONFIRMED')", Long.class, projectId) > 0)
             bad("项目已有生效分配，请先撤销方案再刷新");
-        ProjectWithTasks fetched = client.fetch(projectLinks.getFirst());
-        var existing = new HashMap<String, Long>();
-        db.query("select external_id, internal_id from integration_link where source=? and external_type='TASK'",
-                rs -> { existing.put(rs.getString("external_id"), rs.getLong("internal_id")); }, client.source());
+        // 仅加载本项目任务映射与本地状态（原先是全源跨项目扫描）/ scope the task map and statuses to this project
+        var taskRefs = new HashMap<String, Long>();
+        var statuses = new HashMap<Long, String>();
+        db.query("select l.external_id, l.internal_id, t.status from integration_link l join task t on t.id=l.internal_id"
+                + " where l.source=? and l.external_type='TASK' and t.project_id=?",
+                rs -> { taskRefs.put(rs.getString("external_id"), rs.getLong("internal_id")); statuses.put(rs.getLong("internal_id"), rs.getString("status")); },
+                client.source(), projectId);
         LocalDate start = LocalDate.now();
         db.update("update project set end_date=greatest(end_date, ?), updated_at=now() where id=?",
                 SyncMappers.windowEnd(start, fetched.tasks().stream().map(RemoteTask::hours).toList()), projectId);
         var cursor = start;
-        int added = 0, updated = 0, cancelled = 0;
+        int added = 0, updated = 0, cancelled = 0, frozen = 0;
         var seen = new HashSet<String>();
         for (var task : fetched.tasks()) {
             seen.add(task.externalId());
+            var taskId = taskRefs.get(task.externalId());
+            // 双方均为终态：保留本地排期与记录（历史不漂移），不推进顺序排期游标；
+            // 远端重开则照常重排更新 / both sides terminal: freeze the local record, skip the cursor
+            if (keepLocalSchedule(taskId == null ? null : statuses.get(taskId), task.status())) { frozen++; continue; }
             var window = SyncMappers.schedule(cursor, (int) Math.ceil(task.hours() / 8.0));
             cursor = window[1].plusDays(1);
-            var taskId = existing.get(task.externalId());
-            if (taskId == null || db.queryForObject("select count(*) from task where id=? and project_id=?", Long.class, taskId, projectId) == 0) {
+            if (taskId == null) {
                 long created = db.queryForObject("""
                         insert into task(project_id, name, description, priority, estimated_hours, start_date, end_date, status)
                         values (?,?,?,?,?,?,?,?) returning id""", Long.class,
@@ -121,15 +139,23 @@ public class SyncService {
                 updated++;
             }
         }
-        for (var entry : existing.entrySet()) {
-            if (!seen.contains(entry.getKey()) && db.queryForObject("select count(*) from task where id=? and project_id=?", Long.class, entry.getValue(), projectId) > 0) {
+        // 远端已删：仅取消本地未完结任务，保留 DONE/CANCELLED 的历史 / remote-deleted: cancel only locally open tasks
+        for (var entry : taskRefs.entrySet()) {
+            var localStatus = statuses.get(entry.getValue());
+            if (!seen.contains(entry.getKey()) && !"DONE".equals(localStatus) && !"CANCELLED".equals(localStatus)) {
                 db.update("update task set status='CANCELLED', updated_at=now() where id=?", entry.getValue());
                 cancelled++;
             }
         }
         db.update("update integration_link set synced_at=now() where source=? and external_type='PROJECT' and internal_id=?", client.source(), projectId);
-        log.info("project refreshed from {}, projectId={}, added={}, updated={}, cancelled={}", client.source(), projectId, added, updated, cancelled);
-        return Map.of("projectId", projectId, "remoteTasks", fetched.tasks().size(), "added", added, "updated", updated, "cancelled", cancelled);
+        log.info("project refreshed from {}, projectId={}, added={}, updated={}, cancelled={}, frozen={}", client.source(), projectId, added, updated, cancelled, frozen);
+        return Map.of("projectId", projectId, "remoteTasks", fetched.tasks().size(), "added", added, "updated", updated, "cancelled", cancelled, "frozen", frozen);
+    }
+
+    /** 本地与远端同为终态且一致时冻结本地记录（纯函数，便于单测）/ freeze the local record when both sides agree on a terminal status. */
+    static boolean keepLocalSchedule(String localStatus, String remoteStatus) {
+        return localStatus != null && localStatus.equals(remoteStatus)
+                && ("DONE".equals(localStatus) || "CANCELLED".equals(localStatus));
     }
 
     /** 已从该来源导入的项目（含刷新入口所需状态）/ imported projects with refresh-relevant state. */
@@ -166,7 +192,7 @@ public class SyncService {
     private ExternalProjectClient client(String source) {
         var key = source == null ? "" : source.toLowerCase();
         var client = clients.get(key);
-        if (client == null) bad("不支持的来源：" + key + "，可选 jira / zentao / gitlab");
+        if (client == null) bad("不支持的来源：" + key + "，可选 jira / zentao / gitlab / github");
         if (!client.enabled()) bad("未启用 " + client.source() + " 同步：配置 app.sync." + key + ".enabled=true 及 base-url 与凭证");
         return client;
     }

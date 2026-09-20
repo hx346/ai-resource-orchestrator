@@ -147,9 +147,12 @@ public class ResourcePlanService {
     private List<Map<String,Object>> warnings(long planId) {
         var own=db.queryForList("select i.employee_id,e.name employee_name,i.start_date,i.end_date,i.allocation from resource_plan_item i join employee e on e.id=i.employee_id where i.plan_id=?",planId);
         if(own.isEmpty()) return List.of();
-        var others=db.queryForList("select a.employee_id,e.name employee_name,a.start_date,a.end_date,a.allocation from resource_allocation a join employee e on e.id=a.employee_id where a.status in ('PLANNED','CONFIRMED') and a.plan_id<>? and a.end_date>=current_date",planId);
+        // today 由 Java 传入：与周界计算同口径，避免 DB current_date（服务器时区）与 JVM 时区不一致；
+        // plan_id is distinct from 兼容 NULL（存量行不漏算）/ NULL-safe exclusion of this plan's own rows
+        var today=java.time.LocalDate.now();
+        var others=db.queryForList("select a.employee_id,e.name employee_name,a.start_date,a.end_date,a.allocation from resource_allocation a join employee e on e.id=a.employee_id where a.status in ('PLANNED','CONFIRMED') and a.plan_id is distinct from ? and a.end_date>=?",planId,today);
         var names=new LinkedHashMap<Long,String>(); var load=new HashMap<Long,TreeMap<String,Integer>>();
-        var today=java.time.LocalDate.now(); var first=today.minusDays(today.getDayOfWeek().getValue()-1);
+        var first=today.minusDays(today.getDayOfWeek().getValue()-1);
         for(var r:java.util.stream.Stream.concat(own.stream(),others.stream()).toList()) {
             long employee=((Number)r.get("employee_id")).longValue();
             names.putIfAbsent(employee,(String)r.get("employee_name"));
@@ -250,7 +253,7 @@ public class ResourcePlanService {
             }
             db.update("insert into resource_plan_item(plan_id,project_id,task_id,employee_id,start_date,end_date,allocation) values (?,?,?,?,?,?,?)",id,projectId,t.id(),c.employeeId(),t.start(),t.end(),BigDecimal.valueOf(c.allocation(),2));
         }
-        try { db.update("update resource_plan set gaps=? where id=?",json.writeValueAsString(gaps),id); } catch(java.io.IOException ex) { throw new IllegalStateException(ex); }
+        try { db.update("update resource_plan set gaps=cast(? as jsonb) where id=?",json.writeValueAsString(gaps),id); } catch(java.io.IOException ex) { throw new IllegalStateException(ex); }
     }
     private void requireDraft(Map<String,Object> plan) { if(!"DRAFT".equals(plan.get("status"))) bad("仅草稿方案允许此操作"); }
     private void requireFresh(Map<String,Object> plan,String hash) { if(!hash.equals(plan.get("input_hash"))) throw new BusinessException(ErrorCode.DUPLICATE,"基础数据已变化，请重新求解"); }

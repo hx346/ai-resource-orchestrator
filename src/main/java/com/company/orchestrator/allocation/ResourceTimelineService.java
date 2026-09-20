@@ -11,13 +11,17 @@ public class ResourceTimelineService {
     private final JdbcTemplate db;
     private static final int WEEKS=27;
     public Map<String,Object> timeline() {
+        LocalDate today=LocalDate.now(); // 由 Java 传入查询，避免 DB current_date 与 JVM 时区不一致 / pass today in, keep one timezone
         var bookings=db.queryForList("""
             select a.employee_id,a.start_date,a.end_date,a.allocation,a.status,p.name project_name,coalesce(t.name,'') task_name
             from resource_allocation a join project p on p.id=a.project_id left join task t on t.id=a.task_id
-            where a.status in ('PLANNED','CONFIRMED') and a.end_date>=current_date order by a.employee_id,a.start_date,a.id
-            """);
-        var employees=db.queryForList("select id,name,weekly_hours from employee where status='ACTIVE' order by id limit 500");
-        LocalDate today=LocalDate.now(), first=today.minusDays(today.getDayOfWeek().getValue()-1);
+            where a.status in ('PLANNED','CONFIRMED') and a.end_date>=? order by a.employee_id,a.start_date,a.id
+            """,today);
+        // 多取一行用于判断截断，超 500 显式告知而非静默 / fetch one extra row to detect truncation explicitly
+        var employees=db.queryForList("select id,name,weekly_hours from employee where status='ACTIVE' order by id limit 501");
+        boolean truncated=employees.size()>500;
+        if(truncated) employees=employees.subList(0,500);
+        var first=today.minusDays(today.getDayOfWeek().getValue()-1);
         var weeks=new ArrayList<String>();
         for(var d=first;weeks.size()<WEEKS;d=d.plusWeeks(1)) weeks.add(d.toString());
         var byEmployee=new HashMap<Long,List<Map<String,Object>>>();
@@ -38,7 +42,7 @@ public class ResourceTimelineService {
             }
             rows.add(Map.of("employeeId",id,"name",e.get("name"),"weeklyHours",e.get("weekly_hours"),"bookings",mine,"load",load));
         }
-        return Map.of("weeks",weeks,"rows",rows);
+        return Map.of("weeks",weeks,"rows",rows,"truncated",truncated);
     }
     private static LocalDate date(Object value) { return LocalDate.parse(value.toString()); }
 }

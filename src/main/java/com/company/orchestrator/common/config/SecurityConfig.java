@@ -2,6 +2,8 @@ package com.company.orchestrator.common.config;
 
 import java.io.IOException;
 
+import com.company.orchestrator.auth.LoginRateLimiter;
+import com.company.orchestrator.auth.LoginRateLimitFilter;
 import com.company.orchestrator.common.result.Result;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
@@ -14,6 +16,7 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 /**
  * 同源会话认证、CSRF 保护与四角色权限。
@@ -31,6 +34,7 @@ public class SecurityConfig {
     private static final String KEY_FORBIDDEN = "auth.forbidden";
 
     private final MessageSource messageSource;
+    private final LoginRateLimiter rateLimiter;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -43,12 +47,13 @@ public class SecurityConfig {
             .requestMatchers("/api/**").hasAnyRole("ADMIN", "PROJECT_MANAGER")
             .anyRequest().denyAll())
             .formLogin(f -> f.loginProcessingUrl("/api/v1/auth/login")
-                .successHandler((req, res, auth) -> respond(req, res, 200, "OK", KEY_LOGIN_SUCCESS))
-                .failureHandler((req, res, ex) -> respond(req, res, 401, "UNAUTHORIZED", KEY_LOGIN_FAILURE)))
+                .successHandler((req, res, auth) -> { rateLimiter.reset(LoginRateLimiter.key(auth.getName(), LoginRateLimiter.clientIp(req))); respond(req, res, 200, "OK", KEY_LOGIN_SUCCESS); })
+                .failureHandler((req, res, ex) -> { rateLimiter.recordFailure(LoginRateLimiter.key(req.getParameter("username"), LoginRateLimiter.clientIp(req))); respond(req, res, 401, "UNAUTHORIZED", KEY_LOGIN_FAILURE); }))
             .logout(l -> l.logoutUrl("/api/v1/auth/logout").deleteCookies("JSESSIONID")
                 .logoutSuccessHandler((req, res, auth) -> respond(req, res, 200, "OK", KEY_LOGOUT_SUCCESS)))
             .exceptionHandling(e -> e.authenticationEntryPoint((req, res, ex) -> respond(req, res, 401, "UNAUTHORIZED", KEY_UNAUTHORIZED))
-                .accessDeniedHandler((req, res, ex) -> respond(req, res, 403, "FORBIDDEN", KEY_FORBIDDEN)));
+                .accessDeniedHandler((req, res, ex) -> respond(req, res, 403, "FORBIDDEN", KEY_FORBIDDEN)))
+            .addFilterBefore(new LoginRateLimitFilter(rateLimiter, messageSource), UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
 
