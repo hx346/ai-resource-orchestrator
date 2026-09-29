@@ -29,7 +29,7 @@ export async function streamPlan(id:number,onProgress:(text:string)=>void):Promi
   const t=csrf || await token();
   // 兜底超时（后端 AI 上限 75s，留足余量）/ hard timeout so a stalled stream cannot hang forever
   const response=await fetch(`/api/v1/projects/${id}/ai-plan/stream`,{method:'POST',headers:{[t.headerName]:t.token},signal:AbortSignal.timeout(180_000)});
-  if(!response.ok) throw new Error((await response.json()).message || '规划请求失败');
+  if(!response.ok) { const b=await readJson(response).catch(()=>null); throw new Error(b?.message||'规划请求失败'); }
   const reader=response.body!.getReader(),decoder=new TextDecoder(); let buffer='',result:any;
   for(;;) {
     const chunk=await reader.read(); if(chunk.done) break;
