@@ -108,7 +108,7 @@ public class TaskService {
         log.info("task status changed, id={}, {} -> {}", id, task.getStatus(), status);
     }
 
-    /** 删除任务（连同其依赖与技能需求）/ Delete task with dependencies and skill requirements. */
+    /** 删除任务（连同其依赖、技能需求与同步映射）/ Delete task with dependencies, skill requirements and its sync link. */
     @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
         requireEditable(id);
@@ -119,6 +119,8 @@ public class TaskService {
                 .eq(TaskDependency::getSuccessorTaskId, id));
         requirementMapper.delete(new LambdaQueryWrapper<TaskSkillRequirement>()
                 .eq(TaskSkillRequirement::getTaskId, id));
+        // 同步导入的任务被单独删除时连带清理映射，否则孤儿 link 会让 refresh 撞唯一约束 / clear the sync link or an orphan link dead-ends refresh
+        db.update("delete from integration_link where external_type='TASK' and internal_id=?", id);
         taskMapper.deleteById(id);
         log.info("task deleted, id={}", id);
     }
