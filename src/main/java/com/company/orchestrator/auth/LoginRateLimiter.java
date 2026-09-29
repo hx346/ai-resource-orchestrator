@@ -4,6 +4,7 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -32,6 +33,7 @@ public class LoginRateLimiter {
     private final boolean trustedProxy;
     private final ConcurrentHashMap<String, Deque<Long>> failures = new ConcurrentHashMap<>();
 
+    @Autowired // 双构造器时 Spring 无法隐式选择，显式标注装配入口 / explicit: with two ctors Spring can't pick implicitly
     public LoginRateLimiter(@Value("${app.auth.login-max-failures:5}") int maxFailures,
             @Value("${app.auth.login-lock-minutes:15}") int lockMinutes,
             @Value("${app.auth.trusted-proxy:false}") boolean trustedProxy) {
