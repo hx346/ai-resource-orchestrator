@@ -21,6 +21,8 @@ import jakarta.servlet.http.HttpServletResponse;
  */
 public class LoginRateLimitFilter extends OncePerRequestFilter {
 
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+
     private final LoginRateLimiter limiter;
     private final MessageSource messages;
 
@@ -37,10 +39,11 @@ public class LoginRateLimitFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest req, HttpServletResponse res, FilterChain chain)
             throws ServletException, IOException {
-        if (limiter.blocked(LoginRateLimiter.key(req.getParameter("username"), LoginRateLimiter.clientIp(req)))) {
+        if (limiter.blocked(LoginRateLimiter.key(req.getParameter("username"), limiter.clientIp(req)))) {
             res.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
+            res.setHeader("Retry-After", Long.toString(limiter.lockSeconds()));
             res.setContentType("application/json;charset=UTF-8");
-            new ObjectMapper().writeValue(res.getWriter(), Result.fail("TOO_MANY_ATTEMPTS",
+            MAPPER.writeValue(res.getWriter(), Result.fail("TOO_MANY_ATTEMPTS",
                     messages.getMessage("auth.login.locked", null, "auth.login.locked", req.getLocale())));
             return;
         }
