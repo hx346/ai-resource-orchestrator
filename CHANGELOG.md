@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+### Fixed
+- 单独删除任务时连带清理其 `integration_link` 映射；`V11` 一次性清理存量孤儿 TASK 映射，修复「删除导入任务后增量刷新永久撞唯一约束失败」/ deleting an imported task now clears its TASK-level sync link (`V11` purges existing orphans), so refresh no longer dead-ends on the unique constraint.
+- 登录限速默认忽略可伪造的 `X-Forwarded-For`，仅 `TRUSTED_PROXY=true` 时取末段（可信代理追加的真实来源），关闭伪造 XFF 轮换绕过锁定的漏洞 / the login limiter ignores the spoofable `X-Forwarded-For` unless `TRUSTED_PROXY=true` (then the last hop), closing the lockout bypass via rotating fake XFF values.
+- 登录限速空窗口即时回收并设 10,000 键上限（随机键攻击下整体重置而非无界增长）；429 响应补 `Retry-After` / empty throttle windows are recycled with a 10k key cap; the 429 carries `Retry-After`.
+- `LoginRateLimiter.recordFailure` 改用 `computeIfAbsent` 返回值，消除与并发 `reset` 的 NPE 竞态 / recordFailure reuses the `computeIfAbsent` result, closing an NPE race with concurrent reset.
+- 同步刷新事务开头锁项目行（与 solve/confirm 同惯用法），关闭「守卫检查后 confirm 提交」的交错窗口 / sync refresh takes the project row lock first (same idiom as solve/confirm), closing the post-guard confirm race.
+- AI 规划流式请求的错误分支复用 `readJson`，非 JSON 错误页不再抛裸 `SyntaxError` / the planning stream error path reuses `readJson`, so non-JSON error pages fail readably.
+
 ## [0.11.0] - 2026-09-20
 ### Changed
 - CI 自动触发已关闭（push 到 main/dev、所有 PR 不再运行）；工作流保留，改为仅手动触发（`workflow_dispatch`）/ CI auto-triggers disabled; workflow kept as manual-only (`workflow_dispatch`).
