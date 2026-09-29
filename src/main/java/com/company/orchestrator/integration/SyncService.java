@@ -103,6 +103,11 @@ public class SyncService {
     }
 
     private Map<String, Object> persistRefresh(ExternalProjectClient client, long projectId, ProjectWithTasks fetched) {
+        // 先锁项目行（ROW EXCLUSIVE，与 solve/confirm 同惯用法）：confirm 持有 project 表
+        // SHARE ROW EXCLUSIVE，取行锁后互斥，生效分配守卫之后不再有交错窗口
+        // project row lock first (same idiom as solve/confirm): serializes against
+        // confirm's table lock before the guard so no interleaving window remains.
+        db.queryForList("select id from project where id=? for update", projectId);
         if (db.queryForObject("select count(*) from resource_allocation where project_id=? and status in ('PLANNED','CONFIRMED')", Long.class, projectId) > 0)
             bad("项目已有生效分配，请先撤销方案再刷新");
         // 仅加载本项目任务映射与本地状态（原先是全源跨项目扫描）/ scope the task map and statuses to this project
