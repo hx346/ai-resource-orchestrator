@@ -58,8 +58,10 @@ def main():
     assert sum(1 for l in links if l['externalType'] == 'PROJECT') == 1 and len(links) == 4, links
 
     refresh = call('/sync/jira/refresh', 'POST', {'projectId': pid})
-    assert refresh['remoteTasks'] == 3 and refresh['added'] == 0 and refresh['updated'] == 3, refresh
-    print(f'PASS: jira import ({result["tasksImported"]} tasks, window {result["startDate"]}→{result["endDate"]}), duplicate guard, incremental refresh')
+    # 双方同为终态（WEB-1 done→DONE）冻结不重排，其余照常更新 / the both-terminal
+    # task freezes; the other two refresh normally
+    assert refresh['remoteTasks'] == 3 and refresh['added'] == 0 and refresh['updated'] == 2 and refresh['frozen'] == 1, refresh
+    print(f'PASS: jira import ({result["tasksImported"]} tasks, window {result["startDate"]}→{result["endDate"]}), duplicate guard, incremental refresh (1 frozen)')
 
     # ---- Jira BULK：250 条 issue 验证 startAt 分页拉全 / paged fetch lands every issue ----
     bulk = next(p for p in call('/sync/jira/projects') if p['key'] == 'BULK')
